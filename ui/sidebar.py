@@ -1,6 +1,6 @@
-# ui/sidebar.py
 import streamlit as st
 from datetime import date, timedelta
+
 
 def render_sidebar() -> dict:
     st.sidebar.header("Configuration")
@@ -11,6 +11,7 @@ def render_sidebar() -> dict:
         "Date Range",
         value=(date.today() - timedelta(days=365 * 3), date.today()),
     )
+    start_date, end_date = (date_range if len(date_range) == 2 else (None, None))
 
     risk_pct = st.sidebar.slider(
         "Risk per Trade (%)", min_value=0.1, max_value=5.0, value=1.0, step=0.1
@@ -21,9 +22,9 @@ def render_sidebar() -> dict:
     )
 
     return {
-        "ticker": ticker,
-        "start_date": date_range[0] if len(date_range) == 2 else None,
-        "end_date": date_range[1] if len(date_range) == 2 else None,
+        "ticker": ticker.strip().upper() if ticker else "",
+        "start_date": start_date,
+        "end_date": end_date,
         "risk_pct": risk_pct,
         "initial_capital": initial_capital,
     }
