@@ -2,7 +2,7 @@
 import streamlit as st
 from ui.sidebar import render_sidebar
 from ui.tabs import charts_tab, metrics_tab, trade_log_tab
-from data_access import get_strategy_results
+#from data_access import get_strategy_results
 
 st.set_page_config(page_title="SMC Scanner & Backtester", layout="wide")
 
@@ -17,19 +17,19 @@ def main():
         st.session_state["config"] = config
         st.session_state["should_run"] = True
 
-    if run_clicked:
-        with st.spinner("Fetching data and computing zones..."):
-            try:
-                results = get_strategy_results(
-                    config["ticker"],
-                    config["start_date"],
-                    config["end_date"],
-                    config["risk_pct"],
-                    config["initial_capital"],
-                )
-                st.session_state["results"] = results
-            except Exception as e:
-                st.error(f"Analysis failed: {e}")    
+    # if run_clicked:
+    #     with st.spinner("Fetching data and computing zones..."):
+    #         try:
+    #             results = get_strategy_results(
+    #                 config["ticker"],
+    #                 config["start_date"],
+    #                 config["end_date"],
+    #                 config["risk_pct"],
+    #                 config["initial_capital"],
+    #             )
+    #             st.session_state["results"] = results
+    #         except Exception as e:
+    #             st.error(f"Analysis failed: {e}")    
 
     tab_charts, tab_metrics, tab_logs = st.tabs(
         ["Charts", "Backtest Metrics", "Trade Logs"]
