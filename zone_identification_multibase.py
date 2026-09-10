@@ -1,88 +1,202 @@
-from dataclasses import dataclass
-import numpy as np, pandas as pd, plotly.graph_objects as go, yfinance as yf
+"""
+Adapter between the Streamlit UI and your REAL backend (smc_backend.py).
+
+This is the ANALYSIS half only - zone detection, backtesting, scoring.
+It does NOT build any figures. Plotting is deliberately split out into
+charting.py, which is called from ui/tabs/charts_tab.py at render time
+(cheap, reruns on every filter-widget interaction) rather than baked in
+here (expensive, cached via data_access.py, only reruns when you click
+"Run Analysis"). That split is what lets you re-filter which zones are
+drawn (by Base Count, Strength, Demand/Supply, etc.) without re-running
+zone detection/backtesting/scoring.
+
+One bridging fix applied HERE (not inside smc_backend.py - see the comment
+at BRIDGE FIX below): your real run_risk_management_simulation() drops the
+'Outcome' and 'Date Created' columns that evaluate_strategy_metrics()
+requires, even though they're present one step earlier in df_bt (backtest_zones
+output) and share the same index. Confirmed empirically: df_bt and df_rm
+share the same DatetimeIndex (zone creation date), df_rm is a row-subset of
+df_bt (rows where a trade was never triggered are dropped). So we rejoin
+those two columns from df_bt onto df_rm by index before calling
+evaluate_strategy_metrics(). This is a workaround at the integration layer;
+the cleaner long-term fix is for run_risk_management_simulation() to carry
+those columns through itself.
+"""
+from dataclasses import dataclass, field
+from datetime import date, datetime
+from typing import Optional
+
+import numpy as np
+import pandas as pd
+
+import smc_backend as be
+from data_loading import load_multi_interval
+from ratio_config import default_ratio, resolve_gen_ratio
+
+NIFTY_TICKER = "^NSEI"
+TIMEFRAMES = {"1d": "Daily", "1wk": "Weekly", "1mo": "Monthly"}
+
+
+def _synthetic_ohlc(ticker: str, start: date, end: date) -> pd.DataFrame:
+    """Last-resort fallback: used only if neither a saved CSV nor a live
+    yfinance fetch produced data (e.g. no network, bad ticker)."""
+    idx = pd.date_range(start, end, freq="B")
+    rng = np.random.default_rng(abs(hash(ticker)) % (2**32))
+    price = 100 + np.cumsum(rng.normal(0, 1.5, len(idx)))
+    df = pd.DataFrame(index=idx)
+    df.index.name = "Date"
+    df["Open"] = price + rng.normal(0, 0.5, len(idx))
+    df["Close"] = price
+    df["High"] = df[["Open", "Close"]].max(axis=1) + rng.uniform(0, 1, len(idx))
+    df["Low"] = df[["Open", "Close"]].min(axis=1) - rng.uniform(0, 1, len(idx))
+    df["Volume"] = rng.integers(1_000, 100_000, len(idx))
+    return df
+
+
+def _ensure_volume(df: pd.DataFrame) -> pd.DataFrame:
+    """Several of your real functions (compute_volume_zscore, etc.) expect
+    a Volume column - some saved CSVs may not have one."""
+    if "Volume" not in df.columns:
+        df = df.copy()
+        df["Volume"] = 0
+    return df
+
+
+def _load_ticker_across_timeframes(ticker: str, start_date, end_date, data_dir: str):
+    """Returns ({interval: df}, {interval: source}) for one ticker."""
+    loaded = load_multi_interval(ticker, start_date, end_date, data_dir=data_dir,
+                                  intervals=tuple(TIMEFRAMES.keys()))
+    dfs, sources = {}, {}
+    for tf, (df, source) in loaded.items():
+        if df is None:
+            df = _synthetic_ohlc(f"{ticker}-{tf}", start_date, end_date)
+            source = "synthetic"
+        dfs[tf] = _ensure_volume(df)
+        sources[tf] = source
+    return dfs, sources
+
+
+def _build_nifty_zone_dfs(start_date, end_date, data_dir: str, ratio: dict):
+    """
+    Mirrors your driver script's:
+        nifty_1d_df = identity_zones_with_multibase(data['^NSEI']['1d'], ratio['GEN.NS']['1d'])
+    Returns (dict_of_dfs, dict_of_sources); any timeframe that errors out
+    is set to None (calculate_trade_score already handles None gracefully).
+    """
+    dfs, sources = _load_ticker_across_timeframes(NIFTY_TICKER, start_date, end_date, data_dir)
+    nifty_zones = {}
+    for tf in TIMEFRAMES:
+        try:
+            nifty_zones[tf] = be.identity_zones_with_multibase(dfs[tf].copy(), resolve_gen_ratio(tf, ratio))
+        except Exception:
+            nifty_zones[tf] = None
+    return nifty_zones, sources
+
 
 @dataclass
 class StrategyResults:
-    ticker: str; daily: pd.DataFrame; weekly: pd.DataFrame; monthly: pd.DataFrame
-    trades: pd.DataFrame; risk: pd.DataFrame; metrics: dict; figure: go.Figure
+    ticker: str
+    zones: dict                          # {'1d': df, '1wk': df, '1mo': df} - real columns, for plotting
+    trade_log: pd.DataFrame              # df_rm, bridged with Outcome/Date Created
+    trade_score: pd.DataFrame = field(default_factory=pd.DataFrame)  # df_ts (1d only) - Strength/Freshness/BOS/OB/...
+    data_sources: dict = field(default_factory=dict)       # ticker OHLC sources
+    nifty_data_sources: dict = field(default_factory=dict)  # nifty OHLC sources
+    metrics: dict = field(default_factory=dict)
+    error: Optional[str] = None          # set if the real backend raised
+    analysis_timestamp: Optional[str] = None  # when this StrategyResults was computed
 
-def _data(ticker,start,end):
+
+def recompute_metrics_for_subset(trade_log: pd.DataFrame) -> dict:
+    """
+    Re-runs your real evaluate_strategy_metrics/calculate_composite_score
+    on an already-filtered SLICE of an existing trade_log. This is NOT
+    re-analysis - no zone detection, no backtest, no data fetch - just the
+    same pure-pandas aggregation your functions already do, over fewer
+    rows. Used to show "metrics for the currently filtered zones" without
+    re-running "Run Analysis". Returns {} for an empty/None input.
+    """
+    if trade_log is None or trade_log.empty:
+        return {}
     try:
-        d=yf.download(ticker,start=start,end=end,interval='1d',auto_adjust=True,progress=False)
-        if isinstance(d.columns,pd.MultiIndex): d.columns=d.columns.get_level_values(0)
-        if not d.empty: return d.dropna(subset=['Open','High','Low','Close']).copy()
-    except Exception: pass
-    rng=np.random.default_rng(abs(hash(ticker))%(2**32)); idx=pd.date_range(start,end,freq='B'); n=len(idx)
-    c=100*np.exp(np.cumsum(rng.normal(.0003,.018,n))); o=np.r_[c[0],c[:-1]]*(1+rng.normal(0,.004,n))
-    h=np.maximum(o,c)*(1+rng.uniform(.001,.015,n)); l=np.minimum(o,c)*(1-rng.uniform(.001,.015,n)); v=rng.integers(3e5,5e6,n)
-    return pd.DataFrame({'Open':o,'High':h,'Low':l,'Close':c,'Volume':v},index=idx)
+        metrics = be.evaluate_strategy_metrics(trade_log.copy())
+        metrics["Composite Score"] = be.calculate_composite_score(metrics)
+        return metrics
+    except Exception as e:
+        return {"_error": f"{type(e).__name__}: {e}"}
 
-def identify_zones(df,max_base=5):
-    df=df.copy(); prev=df.Close.shift(); df['TR']=pd.concat([df.High-df.Low,(df.High-prev).abs(),(df.Low-prev).abs()],axis=1).max(axis=1)
-    df['ATR']=df.TR.ewm(span=14,adjust=False).mean(); body=(df.Close-df.Open).abs(); df['TR_ATR']=df.TR/df.ATR; df['Body_TR']=body/df.TR.replace(0,np.nan)
-    df['Is_Exciting']=(df.TR_ATR>.7)&(df.Body_TR>.45); df['Is_Base']=(df.TR_ATR<1.05)&(df.Body_TR<.45); df['Is_Explosive']=(df.TR_ATR>1.15)&(df.Body_TR>.6)
-    df['SMA20']=df.Close.rolling(20).mean(); df['SMA50']=df.Close.rolling(50).mean(); delta=df.Close.diff(); g=delta.clip(lower=0).rolling(14).mean(); lo=(-delta.clip(upper=0)).rolling(14).mean(); df['RSI']=100-100/(1+g/lo.replace(0,np.nan))
-    df['High Volume']=df.Volume>((df.Volume.rolling(22).mean()+1.5*df.Volume.rolling(22).std()))
-    df['Trending']=(df.Close.rolling(22).std()/df.Close.rolling(22).mean())<.055
-    df['Swing_High']=df.High==df.High.rolling(11,center=True).max(); df['Swing_Low']=df.Low==df.Low.rolling(11,center=True).min()
-    ph=df.High.where(df.Swing_High).ffill().shift(6); pl=df.Low.where(df.Swing_Low).ffill().shift(6); df['BOS_Bull']=df.Close>ph; df['BOS_Bear']=df.Close<pl
-    rng=(df.High-df.Low).replace(0,np.nan); up=df.High-df[['Open','Close']].max(axis=1); dn=df[['Open','Close']].min(axis=1)-df.Low
-    df['Sweep_High']=(df.High>ph)&(df.Close<ph)&(up/rng>.45); df['Sweep_Low']=(df.Low<pl)&(df.Close>pl)&(dn/rng>.45)
-    for c in ['Zone_Created','Is Demand','Is Continuous','OB']: df[c]=False
-    df['Base Count']=0; df['Proximal']=np.nan; df['Distal']=np.nan; df['Target']=np.nan
-    for i in range(2,len(df)):
-        if not bool(df.Is_Explosive.iloc[i]): continue
-        j=i-1; cnt=0
-        while j>=0 and bool(df.Is_Base.iloc[j]) and cnt<max_base: cnt+=1; j-=1
-        if cnt<1 or j<0 or not bool(df.Is_Exciting.iloc[j]): continue
-        demand=bool(df.Close.iloc[i]>df.Open.iloc[i]); cont=bool((df.Close.iloc[j]>df.Open.iloc[j])==demand); bs=j+1; be=i-1
-        top=np.maximum(df.Open.iloc[bs:be+1],df.Close.iloc[bs:be+1]); bot=np.minimum(df.Open.iloc[bs:be+1],df.Close.iloc[bs:be+1])
-        prox=float(top.max() if demand else bot.min()); dist=float(df.Low.iloc[bs:i+1].min() if demand else df.High.iloc[bs:i+1].max())
-        df.iloc[i,df.columns.get_loc('Zone_Created')]=True; df.iloc[i,df.columns.get_loc('Is Demand')]=demand; df.iloc[i,df.columns.get_loc('Is Continuous')]=cont; df.iloc[i,df.columns.get_loc('OB')]=True
-        df.iloc[i,df.columns.get_loc('Base Count')]=cnt; df.iloc[i,df.columns.get_loc('Proximal')]=prox; df.iloc[i,df.columns.get_loc('Distal')]=dist; df.iloc[i,df.columns.get_loc('Target')]=prox+2*(prox-dist)
-    return df
 
-def trades(df):
-    out=[]
-    for idx,z in df[df.Zone_Created].iterrows():
-        fut=df.loc[idx:].iloc[1:]; demand=bool(z['Is Demand']); prox=float(z.Proximal); dist=float(z.Distal); tar=float(z.Target)
-        hits=np.where((fut.Low<=prox) if demand else (fut.High>=prox))[0]
-        if not len(hits): continue
-        ei=fut.index[hits[0]]; aft=df.loc[ei:]; th=np.where((aft.High>=tar) if demand else (aft.Low<=tar))[0]; sh=np.where((aft.Low<=dist) if demand else (aft.High>=dist))[0]
-        if not len(th) and not len(sh): xo=aft.index[-1]; xp=float(aft.Close.iloc[-1]); oc='No Exit (Open)'
-        elif not len(sh) or (len(th) and th[0]<sh[0]): xo=aft.index[th[0]]; xp=tar; oc='Profit'
-        else: xo=aft.index[sh[0]]; xp=dist; oc='Stop Loss'
-        ep=prox; pnl=(xp-ep) if demand else (ep-xp); risk=abs(prox-dist)
-        out.append({'Date Created':idx,'Entry Date':ei,'Exit Date':xo,'Zone Type':'Demand' if demand else 'Supply','Entry Price':ep,'Exit Price':xp,'Proximal':prox,'Distal':dist,'Target':tar,'Outcome':oc,'P/L':pnl,'R-Multiple':pnl/risk if risk else 0})
-    return pd.DataFrame(out)
+def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
+                             risk_pct: float, initial_capital: float,
+                             data_dir: str = "data", ratio: dict = None) -> StrategyResults:
+    """
+    Real integration: loads OHLC (CSV-first/live-fallback/synthetic-last-resort)
+    for both `ticker` and the Nifty benchmark, then calls your actual
+    smc_backend.run_strategy_for_ticker(). Any exception from your backend
+    is caught and returned via StrategyResults.error rather than crashing
+    the app. Returns raw zone/trade-score/trade-log data only - no
+    figures; see charting.py for that.
+    """
+    ratio = ratio or default_ratio()
+    ts_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-def risk_sim(t,capital,risk_pct):
-    if t.empty:return pd.DataFrame()
-    cur=float(capital); rows=[]
-    for _,r in t.iterrows():
-        if r.Outcome not in ['Profit','Stop Loss']: continue
-        ra=cur*risk_pct/100; rp=abs(r.Proximal-r.Distal); q=int(ra/rp) if rp else 0; pnl=r['P/L']*q; before=cur; cur+=pnl
-        rows.append({**r.to_dict(),'Capital At Entry':before,'Risk Amount':ra,'Quantity':q,'Trade PnL':pnl,'Capital After Trade':cur})
-    return pd.DataFrame(rows)
+    ticker_dfs, ticker_sources = _load_ticker_across_timeframes(ticker, start_date, end_date, data_dir)
+    nifty_zones, nifty_sources = _build_nifty_zone_dfs(start_date, end_date, data_dir, ratio)
 
-def make_metrics(t,r,capital):
-    v=t[t.Outcome.isin(['Profit','Stop Loss'])] if not t.empty else t; w=v[v.Outcome=='Profit'] if not v.empty else v; l=v[v.Outcome=='Stop Loss'] if not v.empty else v
-    gp=w['P/L'].sum() if len(w) else 0; gl=abs(l['P/L'].sum()) if len(l) else 0; wr=len(w)/len(v)*100 if len(v) else 0; pf=gp/gl if gl else (float('inf') if gp else 0)
-    exp=(wr/100)*(w['P/L'].mean() if len(w) else 0)-(1-wr/100)*(abs(l['P/L'].mean()) if len(l) else 0)
-    dd=((r['Capital After Trade'].cummax()-r['Capital After Trade'])/r['Capital After Trade'].cummax()).max()*100 if not r.empty else 0
-    return {'Total Trades':len(v),'Winning Trades':len(w),'Win Rate':wr,'Profit Factor':pf,'Net PnL':v['P/L'].sum() if len(v) else 0,'Expectancy':exp,'Final Capital':float(r['Capital After Trade'].iloc[-1]) if not r.empty else capital,'Max Drawdown':float(dd)}
+    data = {ticker: ticker_dfs}
 
-def figure(df,show_swing=False,show_bos=False):
-    f=go.Figure([go.Candlestick(x=df.index,open=df.Open,high=df.High,low=df.Low,close=df.Close,name='Price'),go.Scatter(x=df.index,y=df.SMA20,name='SMA 20'),go.Scatter(x=df.index,y=df.SMA50,name='SMA 50')])
-    for idx,z in df[df.Zone_Created].iterrows():
-        col='rgba(0,180,80,.18)' if z['Is Demand'] else 'rgba(220,50,50,.18)'; f.add_shape(type='rect',x0=idx,x1=df.index[-1],y0=z.Proximal,y1=z.Distal,fillcolor=col,line=dict(width=1),layer='below')
-    if show_swing:
-        for mask,name,y,sym in [(df.Swing_High,'Swing High',df.High,'triangle-up'),(df.Swing_Low,'Swing Low',df.Low,'triangle-down')]:
-            x=df[mask]; f.add_trace(go.Scatter(x=x.index,y=y.loc[x.index],mode='markers',name=name,marker_symbol=sym))
-    if show_bos:
-        for mask,name,y in [(df.BOS_Bull,'BOS Bull',df.High*1.01),(df.BOS_Bear,'BOS Bear',df.Low*.99)]:
-            x=df[mask]; f.add_trace(go.Scatter(x=x.index,y=y.loc[x.index],mode='markers',name=name,marker_symbol='star'))
-    f.update_layout(height=650,xaxis_rangeslider_visible=False,margin=dict(l=10,r=10,t=20,b=10)); return f
+    try:
+        out = be.run_strategy_for_ticker(
+            ticker, data, ratio,
+            nifty_zones.get("1d"), nifty_zones.get("1wk"), nifty_zones.get("1mo"),
+            C=initial_capital, risk=risk_pct,
+        )
+    except Exception as e:
+        return StrategyResults(
+            ticker=ticker, zones={}, trade_log=pd.DataFrame(),
+            data_sources=ticker_sources, nifty_data_sources=nifty_sources,
+            error=f"Backend raised {type(e).__name__}: {e}",
+            analysis_timestamp=ts_now,
+        )
 
-def run_strategy_for_ticker(ticker,start_date,end_date,risk_pct,initial_capital,show_swing=False,show_bos=False):
-    d=identify_zones(_data(ticker,start_date,end_date)); w=identify_zones(d.resample('W-FRI').agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()); m=identify_zones(d.resample('ME').agg({'Open':'first','High':'max','Low':'min','Close':'last','Volume':'sum'}).dropna()); t=trades(d); r=risk_sim(t,initial_capital,risk_pct); met=make_metrics(t,r,initial_capital); return StrategyResults(ticker,d,w,m,t,r,met,figure(d,show_swing,show_bos))
+    zones = out.get("zones") or {}
+    if not zones or zones.get("1d") is None:
+        return StrategyResults(
+            ticker=ticker, zones={}, trade_log=pd.DataFrame(),
+            data_sources=ticker_sources, nifty_data_sources=nifty_sources,
+            error=f"No zones were identified for {ticker} with the current ratio settings.",
+            analysis_timestamp=ts_now,
+        )
+
+    trade_score = out.get("anal", {}).get("ts")
+    if trade_score is None:
+        trade_score = pd.DataFrame()
+
+    df_bt = out.get("anal", {}).get("bt")
+    df_rm = out.get("anal", {}).get("rm")
+
+    metrics = {}
+    trade_log = pd.DataFrame()
+    if df_rm is not None and not df_rm.empty:
+        trade_log = df_rm.copy()
+
+        # --- BRIDGE FIX: rejoin columns your real run_risk_management_simulation drops ---
+        if "Outcome" not in trade_log.columns and df_bt is not None and "Outcome" in df_bt.columns:
+            trade_log["Outcome"] = df_bt.loc[trade_log.index, "Outcome"]
+        if "Date Created" not in trade_log.columns:
+            trade_log["Date Created"] = trade_log.index
+        if "Zone_Type" not in trade_log.columns and "Zone_Type" in (df_bt.columns if df_bt is not None else []):
+            trade_log["Zone_Type"] = df_bt.loc[trade_log.index, "Zone_Type"]
+        # --- end bridge fix ---
+
+        try:
+            metrics = be.evaluate_strategy_metrics(trade_log.copy())
+            metrics["Composite Score"] = be.calculate_composite_score(metrics)
+        except Exception as e:
+            metrics = {}
+            trade_log.attrs["metrics_error"] = f"{type(e).__name__}: {e}"
+
+    return StrategyResults(
+        ticker=ticker, zones=zones, trade_log=trade_log, trade_score=trade_score,
+        data_sources=ticker_sources, nifty_data_sources=nifty_sources,
+        metrics=metrics, analysis_timestamp=ts_now,
+    )
