@@ -2,6 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 
 from charting import filter_zones, filter_trade_log
+from filter_state import get_active_filters
 from zone_identification_multibase import recompute_metrics_for_subset
 
 
@@ -120,22 +121,23 @@ def render(config: dict, results):
         st.info("No daily zone data available to filter against.")
         return
 
-    min_base_count = st.session_state.get("min_base_count", 1)
-    zone_types = tuple(st.session_state.get("zone_types") or ["Demand", "Supply"])
-    min_strength = st.session_state.get("min_strength") if st.session_state.get("use_strength") else None
-    fresh_only = st.session_state.get("fresh_only", False)
+    active = get_active_filters(results)
 
     filtered_zones = filter_zones(
-        zones_1d, min_base_count=min_base_count, zone_types=zone_types,
-        trade_score=results.trade_score, min_strength=min_strength, fresh_only=fresh_only,
+        zones_1d, min_base_count=active["min_base_count"], zone_types=active["zone_types"],
+        pattern_types=active["pattern_types"], trade_score=results.trade_score,
+        min_strength=active["min_strength"], fresh_only=active["fresh_only"],
+        bool_filters=active["bool_filters"],
     )
     filtered_trade_log = filter_trade_log(results.trade_log, filtered_zones.index)
 
+    active_bool_flags = [k for k, v in active["bool_filters"].items() if v]
     st.caption(
-        f"Filters currently set on the Charts tab: Min Base Count \u2265 {min_base_count}, "
-        f"Zone Type in {list(zone_types)}"
-        + (f", Min Strength \u2265 {min_strength}" if min_strength is not None else "")
-        + (", Fresh only" if fresh_only else "")
+        f"Filters currently set on the Charts tab: Min Base Count \u2265 {active['min_base_count']}, "
+        f"Zone Type in {list(active['zone_types'])}, Pattern in {list(active['pattern_types'])}"
+        + (f", Min Strength \u2265 {active['min_strength']}" if active["min_strength"] is not None else "")
+        + (", Fresh only" if active["fresh_only"] else "")
+        + (f", flags: {active_bool_flags}" if active_bool_flags else "")
         + f" \u2192 {len(filtered_trade_log)} of {len(results.trade_log)} trades match."
     )
 

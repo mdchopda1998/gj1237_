@@ -78,8 +78,9 @@ def render_sidebar() -> dict:
                           help="Clears chart/table filter selections (Base Count, Zone Type, Strength, etc). "
                                "Does not re-run analysis or change these sidebar settings."):
         for key in list(st.session_state.keys()):
-            if key.startswith(("min_base_count", "zone_types", "use_strength", "min_strength",
-                                "fresh_only", "metrics_use_filtered", "outcome_filter_", "zonetype_filter_")):
+            if key.startswith(("min_base_count", "zone_types", "pattern_types", "use_strength", "min_strength",
+                                "fresh_only", "metrics_use_filtered", "outcome_filter_", "zonetype_filter_",
+                                "ts_bool_")):
                 del st.session_state[key]
         st.rerun()
 

@@ -232,3 +232,48 @@ exceptions at each step (this caught and fixed one real bug during
 development: `zones_display_table` hit a "'Date' is both an index level
 and a column label" error from a `Date`-named index colliding with a
 `Date` column - fixed with an explicit `reset_index(drop=True)`).
+
+## Fixes and additions after real-world testing
+
+### Fixed: crash on Streamlit Cloud (`ProgressColumn` + `NaN`)
+
+`st.column_config.ProgressColumn` requires every cell to be a bounded
+numeric value - it can't render `NaN`. Your real `Piercing_Depth` column
+is `NaN` for any trade whose target/stop was never actually hit (confirmed:
+26 of 37 trades on a 5-year SAIL.NS run), which is normal, valid data, not
+a bug. `ProgressColumn` choked on that and Streamlit's column-config JSON
+serializer surfaced it as `StreamlitAPIException: ... Out of range float
+values are not JSON compliant: nan`. Fixed by switching that column to a
+plain `NumberColumn` (handles `NaN` as a blank cell, which is the correct
+representation for "not applicable").
+
+### Added: every trade-score column is now a chart filter
+
+`filter_state.py` is new: it inspects `results.trade_score` (your real
+`df_ts` / `calculate_trade_score` output) and auto-generates a toggle
+filter for every boolean column that isn't already covered by a dedicated
+control - currently `Gapped`, `Trending`, `High Volume`, `Swing Point`,
+`BOS`, `OB`, `Sweep`, `Trend Support`, `ITF Support`, `HTF Support`,
+`N_LTF Support`, `N_ITF Support`, `N_HTF Support`. This is fully dynamic:
+if your backend's `calculate_trade_score` ever adds another `True`/`False`
+column, a filter for it shows up automatically, no UI changes needed.
+
+Also added a **Pattern (Continuous/Reversal)** filter next to Zone Type -
+this one reads `Is Continuous` directly off the zone dataframe (not
+`trade_score`), so unlike the other new filters it works on all three
+timeframes, not just daily.
+
+`filter_state.get_active_filters()` is the single source of truth for
+"what's currently selected" - both the Charts tab (which owns the widgets)
+and the Metrics tab's "filtered zones only" toggle read from it, so they
+can't drift out of sync with each other.
+
+The zone data table (under each timeframe's chart) now also shows every
+available trade-score column for that zone, not just Strength/Freshness.
+
+Verified with `streamlit.testing.v1.AppTest` end-to-end: ran with the
+default 3-year date range (which does include `NaN` `Piercing_Depth`
+trades) - zero exceptions. Toggled the new `OB` filter (10 \u2192 6 daily
+zones), combined with Pattern=Reversal (\u2192 3 daily zones), then
+confirmed the Metrics tab's filtered toggle reproduces the exact same
+"3 of 10 trades match" - filters and metrics agree.

@@ -10,14 +10,27 @@ import plotly.graph_objects as go
 
 
 def filter_zones(zone_df: pd.DataFrame, min_base_count: int = 1,
-                  zone_types=("Demand", "Supply"), trade_score: pd.DataFrame = None,
-                  min_strength: int = None, fresh_only: bool = False) -> pd.DataFrame:
+                  zone_types=("Demand", "Supply"), pattern_types=("Continuous", "Reversal"),
+                  trade_score: pd.DataFrame = None, min_strength: int = None,
+                  fresh_only: bool = False, bool_filters: dict = None) -> pd.DataFrame:
     """
     Returns the subset of zone_df's Zone_Created rows matching the given
-    filters. `trade_score` (your df_ts / out['anal']['ts']) is only
-    available for the daily timeframe in your real backend - min_strength
-    and fresh_only are silently ignored if it's None/empty, or for zones
-    that were never scored (e.g. weekly/monthly).
+    filters.
+
+    `pattern_types` filters on zone_df's own 'Is Continuous' column, so it
+    works on every timeframe (not just daily).
+
+    `trade_score` (your df_ts / out['anal']['ts']) is only available for
+    the daily timeframe in your real backend - min_strength, fresh_only,
+    and bool_filters are silently ignored (or a no-op) for zones that were
+    never scored (e.g. weekly/monthly).
+
+    `bool_filters` is a {column_name: True} dict for ANY boolean column in
+    trade_score (Gapped, Trending, High Volume, Swing Point, BOS, OB,
+    Sweep, Trend/ITF/HTF Support, N_LTF/N_ITF/N_HTF Support, etc.) - a
+    zone is kept only if that column is True for it. See filter_state.py
+    for how the UI builds this dict dynamically from whatever boolean
+    columns your backend's calculate_trade_score actually produced.
     """
     if zone_df is None or zone_df.empty or "Zone_Created" not in zone_df.columns:
         return pd.DataFrame()
@@ -32,6 +45,11 @@ def filter_zones(zone_df: pd.DataFrame, min_base_count: int = 1,
         allowed = {wanted_is_demand[z] for z in zone_types if z in wanted_is_demand}
         zones = zones[zones["Is Demand"].isin(allowed)]
 
+    if "Is Continuous" in zones.columns and pattern_types:
+        wanted_pattern = {"Continuous": True, "Reversal": False}
+        allowed = {wanted_pattern[p] for p in pattern_types if p in wanted_pattern}
+        zones = zones[zones["Is Continuous"].isin(allowed)]
+
     if trade_score is not None and not trade_score.empty:
         if min_strength is not None:
             strength = zones.index.map(trade_score["Strength"]).to_series(index=zones.index)
@@ -39,6 +57,12 @@ def filter_zones(zone_df: pd.DataFrame, min_base_count: int = 1,
         if fresh_only:
             fresh = zones.index.map(trade_score["Freshness"]).to_series(index=zones.index)
             zones = zones[fresh.fillna(False) == True]  # noqa: E712
+        if bool_filters:
+            for col, want_true in bool_filters.items():
+                if not want_true or col not in trade_score.columns:
+                    continue
+                flag = zones.index.map(trade_score[col]).to_series(index=zones.index)
+                zones = zones[flag.fillna(False) == True]  # noqa: E712
 
     return zones
 
@@ -129,8 +153,10 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
 def zones_display_table(filtered_zones: pd.DataFrame, trade_score: pd.DataFrame = None) -> pd.DataFrame:
     """
     A tidy, display-ready table of the currently filtered zones - date,
-    type, base count, price levels, and (daily only) Strength/Freshness
-    from trade_score if available. Pure formatting, no analysis.
+    type, base count, price levels, and (daily only) EVERY trade_score
+    column (Strength, Freshness, Gapped, Trending, BOS, OB, Sweep,
+    Trend/ITF/HTF Support, N_LTF/N_ITF/N_HTF Support, etc.) merged in when
+    available. Pure formatting, no analysis.
     """
     if filtered_zones is None or filtered_zones.empty:
         return pd.DataFrame()
@@ -149,7 +175,10 @@ def zones_display_table(filtered_zones: pd.DataFrame, trade_score: pd.DataFrame 
     table = pd.DataFrame(cols).reset_index(drop=True)
 
     if trade_score is not None and not trade_score.empty:
-        table["Strength"] = table["Date"].map(trade_score["Strength"])
-        table["Fresh"] = table["Date"].map(trade_score["Freshness"])
+        skip = {"Ticker", "Is Demand", "Is Continuous", "Base Count"}  # already have these above
+        for col in trade_score.columns:
+            if col in skip:
+                continue
+            table[col] = table["Date"].map(trade_score[col])
 
     return table.sort_values("Date", ascending=False).reset_index(drop=True)

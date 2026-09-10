@@ -60,9 +60,10 @@ def render(config: dict, results):
         "Capital_At_Entry": st.column_config.NumberColumn(format="₹%.2f"),
         "Capital_After_Trade": st.column_config.NumberColumn(format="₹%.2f"),
         "Risk_Amount_Per_Trade": st.column_config.NumberColumn(format="₹%.2f"),
-        "Piercing_Depth": st.column_config.ProgressColumn(
-            format="%.2f", min_value=0.0,
-            max_value=max(float(trade_log["Piercing_Depth"].max()), 1.0),
+        "Piercing_Depth": st.column_config.NumberColumn(
+            format="%.2f",
+            help="Fraction of the zone pierced before exit. Blank = trade never entered "
+                 "(target/stop unresolved), so there's nothing to measure.",
         ),
         "Entry Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
         "Exit Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
