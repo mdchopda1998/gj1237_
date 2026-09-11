@@ -17,6 +17,7 @@ def _render_ratio_controls(ratio: dict) -> dict:
              "Switch to Custom to fine-tune manually below.",
     )
     st.sidebar.write(f'Preset Name : {preset_name}')
+    st.sidebar.write(DAILY_PRESETS[preset_name].items())
     if preset_name != "Custom":
         ratio["GEN.NS"]["1d"] = {k: dict(v) for k, v in DAILY_PRESETS[preset_name].items()}
     st.sidebar.write(ratio)
