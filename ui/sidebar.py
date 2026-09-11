@@ -16,10 +16,10 @@ def _render_ratio_controls(ratio: dict) -> dict:
         help="One-click starting points (your original test_scenarios dict). "
              "Switch to Custom to fine-tune manually below.",
     )
-    st.write(f'Preset Name : {preset_name}')
+    st.sidebar.write(f'Preset Name : {preset_name}')
     if preset_name != "Custom":
         ratio["GEN.NS"]["1d"] = {k: dict(v) for k, v in DAILY_PRESETS[preset_name].items()}
-    st.write(ratio)
+    st.sidebar.write(ratio)
 
     with st.sidebar.expander("Advanced: edit TR/ATR & Body/TR thresholds", expanded=False):
         for tf, tf_label in [("1d", "Daily"), ("1wk", "Weekly"), ("1mo", "Monthly")]:
