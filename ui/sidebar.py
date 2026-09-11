@@ -20,6 +20,7 @@ def _render_ratio_controls(ratio: dict) -> dict:
     st.sidebar.write(DAILY_PRESETS[preset_name].items())
     if preset_name != "Custom":
         ratio["GEN.NS"]["1d"] = {k: dict(v) for k, v in DAILY_PRESETS[preset_name].items()}
+    st.sidebar.write('Mayur')
     st.sidebar.write(ratio)
 
     with st.sidebar.expander("Advanced: edit TR/ATR & Body/TR thresholds", expanded=False):
