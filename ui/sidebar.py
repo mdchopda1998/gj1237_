@@ -16,32 +16,28 @@ def _render_ratio_controls(ratio: dict) -> dict:
         help="One-click starting points (your original test_scenarios dict). "
              "Switch to Custom to fine-tune manually below.",
     )
-    st.sidebar.write(f'Preset Name : {preset_name}')
-    st.sidebar.write(DAILY_PRESETS[preset_name].items())
     if preset_name != "Custom":
         ratio["GEN.NS"]["1d"] = {k: dict(v) for k, v in DAILY_PRESETS[preset_name].items()}
-    st.sidebar.write('Mayur')
-    st.sidebar.write(ratio)
 
-    with st.sidebar.expander("Advanced: edit TR/ATR & Body/TR thresholds", expanded=False):
-        for tf, tf_label in [("1d", "Daily"), ("1wk", "Weekly"), ("1mo", "Monthly")]:
-            st.markdown(f"**{tf_label}**")
-            tf_ratio = resolve_gen_ratio(tf, ratio)
-            cols = st.columns(3)
-            for col, candle_type in zip(cols, ["Exciting", "Base", "Explosive"]):
-                with col:
-                    st.caption(candle_type)
-                    tr_atr = st.slider(
-                        f"TR/ATR ({candle_type[:3]}, {tf})", 0.1, 2.0,
-                        float(tf_ratio[candle_type]["TR_ATR"]), 0.1,
-                        key=f"tr_atr_{tf}_{candle_type}",
-                    )
-                    bs_tr = st.slider(
-                        f"Body/TR ({candle_type[:3]}, {tf})", 0.1, 1.0,
-                        float(tf_ratio[candle_type]["BS_TR"]), 0.05,
-                        key=f"bs_tr_{tf}_{candle_type}",
-                    )
-                    ratio["GEN.NS"].setdefault(tf, {})[candle_type] = {"TR_ATR": tr_atr, "BS_TR": bs_tr}
+    # with st.sidebar.expander("Advanced: edit TR/ATR & Body/TR thresholds", expanded=False):
+    #     for tf, tf_label in [("1d", "Daily"), ("1wk", "Weekly"), ("1mo", "Monthly")]:
+    #         st.markdown(f"**{tf_label}**")
+    #         tf_ratio = resolve_gen_ratio(tf, ratio)
+    #         cols = st.columns(3)
+    #         for col, candle_type in zip(cols, ["Exciting", "Base", "Explosive"]):
+    #             with col:
+    #                 st.caption(candle_type)
+    #                 tr_atr = st.slider(
+    #                     f"TR/ATR ({candle_type[:3]}, {tf})", 0.1, 2.0,
+    #                     float(tf_ratio[candle_type]["TR_ATR"]), 0.1,
+    #                     key=f"tr_atr_{tf}_{candle_type}",
+    #                 )
+    #                 bs_tr = st.slider(
+    #                     f"Body/TR ({candle_type[:3]}, {tf})", 0.1, 1.0,
+    #                     float(tf_ratio[candle_type]["BS_TR"]), 0.05,
+    #                     key=f"bs_tr_{tf}_{candle_type}",
+    #                 )
+    #                 ratio["GEN.NS"].setdefault(tf, {})[candle_type] = {"TR_ATR": tr_atr, "BS_TR": bs_tr}
     return ratio
 
 
