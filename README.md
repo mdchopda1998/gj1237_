@@ -329,3 +329,62 @@ exceptions), then a custom 3-ticker batch including one deliberately
 invalid ticker (fell back to synthetic \u2192 "No Trades", not a crash),
 tested sort/filter/download, and confirmed "Load into single-ticker tabs"
 correctly switches the other tabs to the picked ticker's results.
+
+## Zone plotting fixes + Score Analysis tab
+
+### Fixed: zones now start at the first base candle, not the explosive candle
+
+Your real `plot_stock_zones`/`plot_stock_zones_monthly` (in `smc_backend.py`)
+draw each zone rectangle starting at `df.index[Base_Start_Idx]` - the first
+base candle - not at the row where `Zone_Created` is True (the explosive
+breakout candle). Our chart was using the latter. Fixed in
+`charting._zone_bounds()`, which reads the same `Base_Start_Idx` column
+your real `identity_zones_with_multibase` already puts on the zone
+dataframe - confirmed the fix moves x0 earlier than the zone-created date,
+as it should.
+
+### Added: trim zone rectangle at breach (toggle, default on)
+
+Also matches your real plotting functions exactly: a zone's rectangle now
+stops at the first candle whose **Close** crosses `Distal` (demand: Close
+\u2264 Distal, supply: Close \u2265 Distal) - the same rule from your
+source (the High/Low variant is commented out there too, Close is what's
+actually used). New toggle in Chart Filters: **"Trim zone rectangle at
+breach"**, on by default since that's what your backend's own plot
+functions always do; turn it off to extend every rectangle to the edge of
+the chart regardless of breach, if you want the old behavior back.
+
+Breach status now also shows in the zone data table (`Status`: Active /
+Breached, plus `Breach Date`), and `Base Start Date` is a new column
+alongside `Zone Created` (the old single "Date" column was the explosive
+candle's date - kept, just relabeled for clarity now that there's a
+separate start date).
+
+### New tab: 📐 Score Analysis
+
+Answers "how do metrics vary with trade score" - re-aggregates your
+already-computed `trade_log` joined with `trade_score` (`df_ts`), no
+re-analysis:
+
+- **Numeric factors** (Strength, Base Count): bar + line chart of Win Rate
+  and Avg PnL at each value, with trade counts labeled so you can spot
+  small-sample buckets.
+- **Boolean score flags** (every one from `calculate_trade_score` - Gapped,
+  Trending, BOS, OB, Sweep, Trend/ITF/HTF Support, N_LTF/N_ITF/N_HTF
+  Support, etc.): a tornado chart of the Win Rate delta between flag=True
+  and flag=False, ranked by |delta| so the most outcome-correlated factors
+  surface first, plus a full comparison table (N, Win Rate, Avg PnL for
+  both sides) and CSV export.
+
+New `score_analysis.py` holds the pure aggregation logic (`merge_trade_log_with_score`,
+`numeric_breakdown`, `boolean_flag_summary`) - no Streamlit, no backend
+calls, just pandas, so it's independently testable.
+
+Verified end-to-end: confirmed `Base_Start_Idx` date is chronologically
+before the zone-created date (the actual bug), confirmed breach detection
+runs without error, and confirmed the Score Analysis tab surfaces a real,
+sensible signal on the SAIL.NS data (e.g. `BOS=True` zones showing a
+32-point lower win rate than `BOS=False` in this particular run - not a
+claim about what's generally true, just evidence the computation works).
+All 5 tabs checked via `AppTest` with zero exceptions, including toggling
+the new breach-trim control off and back on.

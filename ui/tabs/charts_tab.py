@@ -60,6 +60,14 @@ def render(config: dict, results):
                 st.multiselect("Pattern", ["Continuous", "Reversal"], default=["Continuous", "Reversal"],
                                 key="pattern_types")
 
+        st.toggle(
+            "Trim zone rectangle at breach (matches your backend's plot_stock_zones)",
+            value=True, key="trim_at_breach",
+            help="ON: each zone rectangle stops at the first candle whose Close crosses "
+                 "Distal (breached/invalidated), same rule your real plot_stock_zones uses. "
+                 "OFF: rectangles extend to the edge of the chart regardless of breach.",
+        )
+
         has_trade_score = results.trade_score is not None and not results.trade_score.empty
         if has_trade_score:
             bool_cols = trade_score_bool_columns(results.trade_score)
@@ -114,7 +122,8 @@ def render(config: dict, results):
                 bool_filters=active["bool_filters"] if is_daily else None,
             )
             fig = build_zone_figure(zone_df, config["ticker"], tf_label,
-                                     filtered_zones=filtered, trade_score=score_df)
+                                     filtered_zones=filtered, trade_score=score_df,
+                                     trim_at_breach=st.session_state.get("trim_at_breach", True))
             st.plotly_chart(fig, use_container_width=True)
 
             total_zones = int(zone_df["Zone_Created"].sum()) if "Zone_Created" in zone_df.columns else 0
@@ -126,7 +135,7 @@ def render(config: dict, results):
             )
 
             with st.expander(f"View {len(filtered)} filtered zone(s) as a table", expanded=False):
-                table = zones_display_table(filtered, trade_score=score_df)
+                table = zones_display_table(filtered, trade_score=score_df, zone_df=zone_df)
                 if table.empty:
                     st.caption("No zones match the current filters.")
                 else:
@@ -134,7 +143,9 @@ def render(config: dict, results):
                         "Proximal": st.column_config.NumberColumn(format="₹%.2f"),
                         "Distal": st.column_config.NumberColumn(format="₹%.2f"),
                         "Target": st.column_config.NumberColumn(format="₹%.2f"),
-                        "Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
+                        "Zone Created": st.column_config.DateColumn(format="YYYY-MM-DD"),
+                        "Base Start Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
+                        "Breach Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
                     }
                     st.dataframe(table, use_container_width=True, hide_index=True,
                                  column_config=column_config)
