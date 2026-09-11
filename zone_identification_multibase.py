@@ -145,7 +145,8 @@ def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
     nifty_zones, nifty_sources = _build_nifty_zone_dfs(start_date, end_date, data_dir, ratio)
 
     data = {ticker: ticker_dfs}
-
+    st.sidebar.write('Mayur1')
+    st.sidebar.write(ratio)
     try:
         out = be.run_strategy_for_ticker(
             ticker, data, ratio,
