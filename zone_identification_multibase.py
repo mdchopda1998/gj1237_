@@ -28,6 +28,7 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
+import streamlit as st
 
 import smc_backend as be
 from data_loading import load_multi_interval
@@ -76,6 +77,7 @@ def _load_ticker_across_timeframes(ticker: str, start_date, end_date, data_dir: 
     return dfs, sources
 
 
+@st.cache_data(show_spinner=False)
 def _build_nifty_zone_dfs(start_date, end_date, data_dir: str, ratio: dict):
     """
     Mirrors your driver script's:

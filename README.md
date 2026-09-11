@@ -277,3 +277,55 @@ trades) - zero exceptions. Toggled the new `OB` filter (10 \u2192 6 daily
 zones), combined with Pattern=Reversal (\u2192 3 daily zones), then
 confirmed the Metrics tab's filtered toggle reproduces the exact same
 "3 of 10 trades match" - filters and metrics agree.
+
+## Batch Analysis (new tab)
+
+A 4th tab, **🗂️ Batch Analysis**, runs the identical per-ticker pipeline
+(`zone_identification_multibase.run_strategy_for_ticker`, same as the
+single-ticker tabs, via the same cached `data_access.get_strategy_results`)
+once per selected ticker, using whatever's currently set in the sidebar
+(date range, risk %, capital, ratio config). No backend logic changed -
+this is the same call, looped, with results combined into one table with
+**Ticker as a column**.
+
+### Ticker sources
+- **NIFTY 50 / NIFTY Next 50 / NIFTY 100** - built-in presets from
+  `index_constituents.py`, static snapshots (dated Dec 2025 / Apr 2026).
+  NSE rebalances these semi-annually, so they'll drift - the tab shows the
+  "as of" date, and there's a note pointing at niftyindices.com for
+  verification. Two symbols were deliberately left out rather than
+  guessed (see the file's comments) - add them yourself once confirmed.
+- **Custom list** - comma or newline separated tickers, typed directly.
+- **Upload CSV** - any CSV with tickers in its first column.
+
+### What you get back
+One row per ticker: Status (OK / No Trades / Error), Composite Score, Win
+Rate, Profit Factor, System Expectancy, Total Trades, Net PNL, Demand/Supply
+Zone counts. Sortable by any of those, filterable by minimum Composite
+Score, downloadable as CSV. Tickers that errored get their own expander
+with the actual exception message - a bad ticker never aborts the whole
+batch (each one is wrapped individually, on top of the adapter's existing
+CSV/live/synthetic fallback, which already means most "bad" tickers
+resolve to "No Trades" rather than a hard error).
+
+### Drilling into a single ticker
+Since batch mode already computed the *full* `StrategyResults` (zones,
+trade_score, trade_log, not just the summary metrics) for every successful
+ticker, "Load into single-ticker tabs" just points the Charts/Metrics/Trade
+Log tabs at an already-computed result - no re-run, no extra backend call.
+
+### Performance note
+Batch mode calls the same cached function per ticker, so re-running a
+batch with overlapping tickers/settings is instant for anything already
+seen. The Nifty (^NSEI) benchmark computation - previously recomputed on
+every single call - is now cached on `(start_date, end_date, data_dir,
+ratio)` in the adapter, so a 50-ticker batch computes it once, not fifty
+times (measured: ~1.0s first call \u2192 ~0.002s on repeat). Large batches
+using live yfinance fetches (no local CSVs) can still take several
+minutes; the tab warns above 25 tickers and suggests local CSVs.
+
+Verified with `AppTest`: ran the actual NIFTY 50 preset (50 tickers, zero
+exceptions), then a custom 3-ticker batch including one deliberately
+invalid ticker (fell back to synthetic \u2192 "No Trades", not a crash),
+tested sort/filter/download, and confirmed "Load into single-ticker tabs"
+correctly switches the other tabs to the picked ticker's results.

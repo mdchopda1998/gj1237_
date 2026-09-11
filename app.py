@@ -9,7 +9,7 @@ import streamlit as st
 from data_access import get_strategy_results
 from data_loading import load_multi_interval
 from ui.sidebar import render_sidebar
-from ui.tabs import charts_tab, metrics_tab, trade_log_tab
+from ui.tabs import charts_tab, metrics_tab, trade_log_tab, batch_tab
 from zone_identification_multibase import NIFTY_TICKER, TIMEFRAMES
 
 st.set_page_config(page_title="SMC Scanner & Backtester", layout="wide", page_icon="📈")
@@ -17,7 +17,7 @@ st.set_page_config(page_title="SMC Scanner & Backtester", layout="wide", page_ic
 # Bump this on every delivered zip. If this string doesn't match what you
 # expect to see under the title, you're running stale files - re-unzip
 # and replace the WHOLE folder rather than copying individual files over.
-APP_BUILD = "2026-09-09-ui-refresh-v1"
+APP_BUILD = "2026-09-10-batch-analysis-v1"
 
 
 def _run_analysis_with_status(config: dict):
@@ -89,8 +89,8 @@ def main():
     if results is not None and getattr(results, "error", None):
         st.error(f"Backend error for {results.ticker}: {results.error}")
 
-    tab_charts, tab_metrics, tab_logs = st.tabs(
-        ["📊 Charts", "📈 Backtest Metrics", "🧾 Trade Logs"]
+    tab_charts, tab_metrics, tab_logs, tab_batch = st.tabs(
+        ["📊 Charts", "📈 Backtest Metrics", "🧾 Trade Logs", "🗂️ Batch Analysis"]
     )
 
     with tab_charts:
@@ -101,6 +101,9 @@ def main():
 
     with tab_logs:
         trade_log_tab.render(active_config, results)
+
+    with tab_batch:
+        batch_tab.render(active_config)
 
 
 if __name__ == "__main__":
