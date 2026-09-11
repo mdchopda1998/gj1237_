@@ -71,7 +71,7 @@ DAILY_PRESETS = {
     # Backtested against SAIL_NS_1d.csv earlier in this project (41 zones,
     # 63.9% win rate, +0.92R expectancy) - included as a fourth preset.
     "SAIL_Backtested": {
-        "Exciting": {"TR_ATR": 0.5, "BS_TR": 0.5},
+        "Exciting": {"TR_ATR": 0.5, "BS_TR": 0.6},
         "Base": {"TR_ATR": 1.2, "BS_TR": 0.5},
         "Explosive": {"TR_ATR": 1.2, "BS_TR": 0.6},
     },

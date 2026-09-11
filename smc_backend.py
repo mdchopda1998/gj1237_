@@ -111,7 +111,7 @@ def load_data(drive_load_dir,tickers=None):
       print("\n--- All data loaded from Google Drive ---")
       return loaded_data_multi
 
-def download_data(ticker, start_date="2023-01-01", end_date=None, intervals=["1d", "1wk", "1mo"]):
+def download_data(ticker, start_date="2021-01-01", end_date=None, intervals=["1d", "1wk", "1mo"]):
     """
     Downloads data for multiple intervals efficiently.
     Returns a dictionary: {interval: dataframe}
