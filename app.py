@@ -68,7 +68,8 @@ def main():
                 results = _run_analysis_with_status(config)
                 st.session_state["results"] = results
                 st.session_state["config"] = config
-                print(config)
+                st.sidebar.write('Mayur')
+                st.sidebar.write(config)
                 if getattr(results, "error", None):
                     st.toast(f"Analysis failed for {results.ticker}", icon="⚠️")
                 else:
