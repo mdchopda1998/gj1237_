@@ -58,7 +58,7 @@ def render_sidebar() -> dict:
     ) / 100.0
 
     initial_capital = st.sidebar.number_input(
-        "Initial Capital (₹)", min_value=10_000, value=500_000, step=10_000
+        "Initial Capital (₹)", min_value=10_000, value=100_000, step=10_000
     )
 
     st.sidebar.divider()
