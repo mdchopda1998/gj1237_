@@ -48,7 +48,7 @@ def render_sidebar() -> dict:
 
     date_range = st.sidebar.date_input(
         "Date Range",
-        value=(date.today() - timedelta(days=365 * 3), date.today()),
+        value=(date.today() - timedelta(days=365 * 5), date.today()),
     )
     start_date, end_date = (date_range if len(date_range) == 2 else (None, None))
 
