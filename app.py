@@ -18,7 +18,7 @@ st.set_page_config(page_title="SMC Scanner & Backtester", layout="wide", page_ic
 # Bump this on every delivered zip. If this string doesn't match what you
 # expect to see in the header badges, you're running stale files - re-unzip
 # and replace the WHOLE folder rather than copying individual files over.
-APP_BUILD = "2026-09-13-statcard-html-fix-v1"
+APP_BUILD = "2026-09-13-outcome-filter-v1"
 
 
 def _run_analysis_with_status(config: dict):

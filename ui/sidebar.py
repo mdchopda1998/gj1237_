@@ -179,7 +179,7 @@ def render_sidebar() -> dict:
         for key in list(st.session_state.keys()):
             if key.startswith(("min_base_count", "zone_types", "pattern_types", "trim_at_breach", "use_strength", "min_strength",
                                 "fresh_only", "metrics_use_filtered", "outcome_filter_", "zonetype_filter_",
-                                "ts_bool_")):
+                                "ts_bool_", "outcome_types", "tradelog_use_chart_filters")):
                 del st.session_state[key]
         st.rerun()
 

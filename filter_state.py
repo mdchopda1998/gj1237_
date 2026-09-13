@@ -1,8 +1,9 @@
 """
 Reads the current filter widget values out of st.session_state into a
 plain dict. Both charts_tab.py (which owns the widgets) and metrics_tab.py
-(which needs to reproduce the exact same subset for "filtered metrics")
-call this, so the two can never drift out of sync with each other.
+/trade_log_tab.py (which need to reproduce the exact same subset for
+"filtered metrics"/"filtered trade log") call this, so none of them can
+drift out of sync with each other.
 
 TS_BOOL_EXCLUDE columns are left out of the auto-generated boolean filter
 list because they already have dedicated, differently-named controls
@@ -29,15 +30,32 @@ def bool_filter_key(col: str) -> str:
     return f"ts_bool_{col}"
 
 
+def outcome_options(trade_log) -> list:
+    """
+    Every distinct Outcome value actually present in your real
+    run_risk_management_simulation output (typically 'Profit'/'Stop Loss',
+    but this reads whatever's really there rather than hardcoding those
+    two - e.g. it'll also pick up 'Invalidated (Gap Through Zone)' style
+    outcomes if your backend produces them). NaN/None dropped, not a real
+    outcome to filter by.
+    """
+    if trade_log is None or trade_log.empty or "Outcome" not in trade_log.columns:
+        return []
+    return sorted(trade_log["Outcome"].dropna().unique().tolist())
+
+
 def get_active_filters(results) -> dict:
     """Everything filter_zones() needs, read from session_state as the
     Charts tab widgets last left it."""
     trade_score = getattr(results, "trade_score", None) if results is not None else None
+    trade_log = getattr(results, "trade_log", None) if results is not None else None
 
     bool_filters = {}
     for col in trade_score_bool_columns(trade_score):
         if st.session_state.get(bool_filter_key(col)):
             bool_filters[col] = True
+
+    all_outcomes = outcome_options(trade_log)
 
     return dict(
         min_base_count=st.session_state.get("min_base_count", 1),
@@ -46,4 +64,5 @@ def get_active_filters(results) -> dict:
         min_strength=st.session_state.get("min_strength") if st.session_state.get("use_strength") else None,
         fresh_only=st.session_state.get("fresh_only", False),
         bool_filters=bool_filters,
+        outcome_types=tuple(st.session_state.get("outcome_types") or all_outcomes),
     )

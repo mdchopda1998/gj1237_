@@ -1,5 +1,7 @@
 import streamlit as st
 
+from charting import filter_zones, filter_trade_log
+from filter_state import get_active_filters, outcome_options as shared_outcome_options
 from ui.style import section_header, stat_cards
 
 
@@ -26,27 +28,70 @@ def render(config: dict, results):
         st.warning("No trades were taken for the selected parameters.")
         return
 
-    outcome_options, outcome_filled = _safe_options(trade_log["Outcome"])
-    zone_options, zone_filled = _safe_options(trade_log["Zone_Type"])
+    use_chart_filters = st.toggle(
+        "Show only trades matching current Chart Filters (Base Count, Zone Type, "
+        "Pattern, Strength, Freshness, score flags, Outcome)",
+        value=False, key="tradelog_use_chart_filters",
+        help="Mirrors the Metrics tab's equivalent toggle - re-slices this trade log "
+             "using whatever's currently set on the Charts tab, without re-running "
+             "zone detection/backtest/scoring.",
+    )
+
+    trade_log_source = trade_log
+    if use_chart_filters:
+        zones_1d = results.zones.get("1d")
+        if zones_1d is None or zones_1d.empty:
+            st.info("No daily zone data available to filter against.")
+            return
+
+        active = get_active_filters(results)
+        filtered_zones = filter_zones(
+            zones_1d, min_base_count=active["min_base_count"], zone_types=active["zone_types"],
+            pattern_types=active["pattern_types"], trade_score=results.trade_score,
+            min_strength=active["min_strength"], fresh_only=active["fresh_only"],
+            bool_filters=active["bool_filters"],
+            trade_log=trade_log, outcome_types=active["outcome_types"],
+        )
+        trade_log_source = filter_trade_log(trade_log, filtered_zones.index)
+
+        active_bool_flags = [k for k, v in active["bool_filters"].items() if v]
+        all_outcomes = set(shared_outcome_options(trade_log))
+        outcome_narrowed = set(active["outcome_types"]) != all_outcomes and all_outcomes
+        st.caption(
+            f"Chart Filters: Min Base Count \u2265 {active['min_base_count']}, "
+            f"Zone Type in {list(active['zone_types'])}, Pattern in {list(active['pattern_types'])}"
+            + (f", Min Strength \u2265 {active['min_strength']}" if active["min_strength"] is not None else "")
+            + (", Fresh only" if active["fresh_only"] else "")
+            + (f", flags: {active_bool_flags}" if active_bool_flags else "")
+            + (f", Outcome in {list(active['outcome_types'])}" if outcome_narrowed else "")
+            + f" \u2192 {len(trade_log_source)} of {len(trade_log)} trades match."
+        )
+
+        if trade_log_source.empty:
+            st.warning("No trades match the current chart filters.")
+            return
+
+    outcome_opts, outcome_filled = _safe_options(trade_log_source["Outcome"])
+    zone_opts, zone_filled = _safe_options(trade_log_source["Zone_Type"])
 
     c1, c2 = st.columns(2)
     with c1:
         if hasattr(st, "pills"):
-            outcome_filter = st.pills("Outcome", options=outcome_options, default=outcome_options,
+            outcome_filter = st.pills("Outcome", options=outcome_opts, default=outcome_opts,
                                        selection_mode="multi", key="outcome_filter_pills")
         else:
-            outcome_filter = st.multiselect("Outcome", options=outcome_options, default=outcome_options)
+            outcome_filter = st.multiselect("Outcome", options=outcome_opts, default=outcome_opts)
     with c2:
         if hasattr(st, "pills"):
-            zone_filter = st.pills("Zone type", options=zone_options, default=zone_options,
+            zone_filter = st.pills("Zone type", options=zone_opts, default=zone_opts,
                                     selection_mode="multi", key="zonetype_filter_pills")
         else:
-            zone_filter = st.multiselect("Zone type", options=zone_options, default=zone_options)
+            zone_filter = st.multiselect("Zone type", options=zone_opts, default=zone_opts)
 
     outcome_filter = outcome_filter or []
     zone_filter = zone_filter or []
 
-    filtered = trade_log[
+    filtered = trade_log_source[
         outcome_filled.isin(outcome_filter) & zone_filled.isin(zone_filter)
     ]
 
@@ -74,7 +119,7 @@ def render(config: dict, results):
         "Date Created": st.column_config.DateColumn(format="YYYY-MM-DD"),
     }
     st.dataframe(filtered, use_container_width=True, hide_index=True, column_config=column_config)
-    st.caption(f"{len(filtered)} of {len(trade_log)} trades shown.")
+    st.caption(f"{len(filtered)} of {len(trade_log_source)} trades shown.")
 
     st.download_button(
         "⬇ Download trade log as CSV", filtered.to_csv(index=True).encode("utf-8"),

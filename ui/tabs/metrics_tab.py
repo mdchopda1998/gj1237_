@@ -4,7 +4,7 @@ import streamlit as st
 import plotly.graph_objects as go
 
 from charting import filter_zones, filter_trade_log, _theme_layout, FONT_STACK
-from filter_state import get_active_filters
+from filter_state import get_active_filters, outcome_options
 from zone_identification_multibase import recompute_metrics_for_subset
 from ui.style import PALETTE, section_header, stat_cards
 
@@ -186,16 +186,20 @@ def render(config: dict, results):
         pattern_types=active["pattern_types"], trade_score=results.trade_score,
         min_strength=active["min_strength"], fresh_only=active["fresh_only"],
         bool_filters=active["bool_filters"],
+        trade_log=results.trade_log, outcome_types=active["outcome_types"],
     )
     filtered_trade_log = filter_trade_log(results.trade_log, filtered_zones.index)
 
     active_bool_flags = [k for k, v in active["bool_filters"].items() if v]
+    all_outcomes = set(outcome_options(results.trade_log))
+    outcome_narrowed = set(active["outcome_types"]) != all_outcomes and all_outcomes
     st.caption(
         f"Filters currently set on the Charts tab: Min Base Count \u2265 {active['min_base_count']}, "
         f"Zone Type in {list(active['zone_types'])}, Pattern in {list(active['pattern_types'])}"
         + (f", Min Strength \u2265 {active['min_strength']}" if active["min_strength"] is not None else "")
         + (", Fresh only" if active["fresh_only"] else "")
         + (f", flags: {active_bool_flags}" if active_bool_flags else "")
+        + (f", Outcome in {list(active['outcome_types'])}" if outcome_narrowed else "")
         + f" \u2192 {len(filtered_trade_log)} of {len(results.trade_log)} trades match."
     )
 

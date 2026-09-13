@@ -83,7 +83,8 @@ def _zone_bounds(zone_df: pd.DataFrame, zdate, zone: pd.Series, trim_at_breach: 
 def filter_zones(zone_df: pd.DataFrame, min_base_count: int = 1,
                   zone_types=("Demand", "Supply"), pattern_types=("Continuous", "Reversal"),
                   trade_score: pd.DataFrame = None, min_strength: int = None,
-                  fresh_only: bool = False, bool_filters: dict = None) -> pd.DataFrame:
+                  fresh_only: bool = False, bool_filters: dict = None,
+                  trade_log: pd.DataFrame = None, outcome_types=None) -> pd.DataFrame:
     """
     Returns the subset of zone_df's Zone_Created rows matching the given
     filters.
@@ -102,6 +103,13 @@ def filter_zones(zone_df: pd.DataFrame, min_base_count: int = 1,
     zone is kept only if that column is True for it. See filter_state.py
     for how the UI builds this dict dynamically from whatever boolean
     columns your backend's calculate_trade_score actually produced.
+
+    `trade_log` + `outcome_types`: filters zones down to ones whose
+    resulting trade's Outcome (Profit/Stop Loss/etc, from your real
+    run_risk_management_simulation output) is in `outcome_types`. Like
+    trade_score, trade_log only exists for the daily timeframe. A zone
+    with no matching trade_log row (never triggered) is excluded whenever
+    this filter is active, since there's no outcome to match against.
     """
     if zone_df is None or zone_df.empty or "Zone_Created" not in zone_df.columns:
         return pd.DataFrame()
@@ -134,6 +142,15 @@ def filter_zones(zone_df: pd.DataFrame, min_base_count: int = 1,
                     continue
                 flag = zones.index.map(trade_score[col]).to_series(index=zones.index)
                 zones = zones[flag.fillna(False) == True]  # noqa: E712
+
+    if trade_log is not None and not trade_log.empty and outcome_types:
+        all_outcomes = set(trade_log["Outcome"].dropna().unique().tolist())
+        # No-op if every available outcome is selected (nothing to exclude) -
+        # avoids dropping untriggered zones just because the filter widget
+        # happens to be rendered with its full default selection.
+        if set(outcome_types) != all_outcomes:
+            outcomes = zones.index.map(trade_log["Outcome"]).to_series(index=zones.index)
+            zones = zones[outcomes.isin(outcome_types)]
 
     return zones
 

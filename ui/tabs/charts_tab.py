@@ -1,7 +1,7 @@
 import streamlit as st
 
 from charting import filter_zones, build_zone_figure, zones_display_table
-from filter_state import get_active_filters, trade_score_bool_columns, bool_filter_key
+from filter_state import get_active_filters, trade_score_bool_columns, bool_filter_key, outcome_options
 from ui.style import section_header
 
 TF_LABELS = {"1d": "Daily", "1wk": "Weekly", "1mo": "Monthly"}
@@ -71,22 +71,41 @@ def render(config: dict, results):
         )
 
         has_trade_score = results.trade_score is not None and not results.trade_score.empty
-        if has_trade_score:
+        has_trade_log = results.trade_log is not None and not results.trade_log.empty
+        available_outcomes = outcome_options(results.trade_log)
+
+        if has_trade_score or available_outcomes:
             bool_cols = trade_score_bool_columns(results.trade_score)
+            n_daily_filters = 2 + len(bool_cols) + (1 if available_outcomes else 0)
             with st.expander(
-                f"Daily-only filters — every trade-score column ({2 + len(bool_cols)} total)",
+                f"Daily-only filters — every trade-score column ({n_daily_filters} total)",
                 expanded=False,
             ):
                 st.caption(
-                    "All of these come from your real calculate_trade_score output "
-                    "(df_ts) - only computed for the daily timeframe, so they have no "
-                    "effect on the Weekly/Monthly charts."
+                    "All of these come from your real calculate_trade_score / "
+                    "run_risk_management_simulation output - only computed for the "
+                    "daily timeframe, so they have no effect on the Weekly/Monthly charts."
                 )
-                st.toggle("Filter by minimum Strength", value=False, key="use_strength")
-                if st.session_state.get("use_strength"):
+                st.toggle("Filter by minimum Strength", value=False, key="use_strength",
+                          disabled=not has_trade_score)
+                if has_trade_score and st.session_state.get("use_strength"):
                     max_strength = int(results.trade_score["Strength"].max())
                     st.slider("Min Strength", 0, max(max_strength, 1), 0, key="min_strength")
-                st.toggle("Fresh zones only", value=False, key="fresh_only")
+                st.toggle("Fresh zones only", value=False, key="fresh_only", disabled=not has_trade_score)
+
+                if available_outcomes:
+                    st.markdown("**Trade outcome** (zones whose resulting trade matches):")
+                    if hasattr(st, "pills"):
+                        st.pills("Outcome", available_outcomes, default=available_outcomes,
+                                 selection_mode="multi", key="outcome_types")
+                    else:
+                        st.multiselect("Outcome", available_outcomes, default=available_outcomes,
+                                       key="outcome_types")
+                    st.caption(
+                        "Only affects zones that actually triggered a trade - zones "
+                        "never entered have no outcome to match, so they're excluded "
+                        "whenever this filter narrows the selection below 'all'."
+                    )
 
                 if bool_cols:
                     st.markdown("**Score flags** (zone must be True for each one enabled):")
@@ -108,10 +127,12 @@ def render(config: dict, results):
                 st.info(f"No {tf_label.lower()} data available.")
                 continue
 
-            # Strength/Freshness/bool score flags only apply to the daily
-            # tab, since that's the only timeframe your backend scores.
+            # Strength/Freshness/bool score flags/Outcome only apply to the
+            # daily tab, since that's the only timeframe your backend
+            # scores and backtests.
             is_daily = tf_key == "1d"
             score_df = results.trade_score if is_daily else None
+            log_df = results.trade_log if is_daily else None
 
             filtered = filter_zones(
                 zone_df,
@@ -122,6 +143,8 @@ def render(config: dict, results):
                 min_strength=active["min_strength"] if is_daily else None,
                 fresh_only=active["fresh_only"] if is_daily else False,
                 bool_filters=active["bool_filters"] if is_daily else None,
+                trade_log=log_df,
+                outcome_types=active["outcome_types"] if is_daily else None,
             )
             fig = build_zone_figure(zone_df, config["ticker"], tf_label,
                                      filtered_zones=filtered, trade_score=score_df,

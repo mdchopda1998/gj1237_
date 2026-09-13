@@ -662,3 +662,51 @@ is the global CSS `<style>` block, which is supposed to have indentation
 - that's normal CSS, not a bug), and confirmed "Final Capital", "Net
 PNL", "Total Trades", and "Win Rate" all appear as expected text in the
 rendered output.
+
+## Outcome (Profit/Loss) joins the shared filter system + Trade Log mirrors it
+
+### Outcome is now a shared Chart Filter
+
+`filter_state.py` gained `outcome_options(trade_log)` - every distinct
+value actually present in your real `run_risk_management_simulation`
+output (not hardcoded to "Profit"/"Stop Loss"; it reads whatever's really
+there, so it'd pick up something like "Invalidated (Gap Through Zone)"
+too if your backend ever produces it) - and `get_active_filters()` now
+includes `outcome_types`.
+
+`charting.filter_zones()` gained `trade_log`/`outcome_types` parameters:
+a zone is kept only if its resulting trade's Outcome is in the selected
+set. Like Strength/Freshness/score flags, this only has an effect on the
+daily timeframe (trade_log doesn't exist for weekly/monthly) - and a zone
+that never triggered a trade is excluded whenever this filter is actively
+narrowing the selection (there's no outcome to match against an
+untriggered zone).
+
+The Charts tab's "Daily-only filters" expander now has an **Outcome**
+pills control alongside Strength/Freshness/score flags - narrowing it
+(e.g. to "Profit" only) changes which zones are drawn on the chart, same
+as every other filter there.
+
+### Trade Log tab now mirrors the shared filters
+
+New toggle: **"Show only trades matching current Chart Filters"** - reads
+the exact same `get_active_filters()` state the Charts tab set (Base
+Count, Zone Type, Pattern, Strength, Freshness, score flags, and now
+Outcome), re-slices the trade log accordingly, and shows a caption
+describing exactly which filters are active and how many trades matched -
+same pattern as the Metrics tab's existing "filtered metrics" toggle, so
+all three tabs (Charts/Metrics/Trade Log) can now show a consistent view
+of "just this subset" without ever re-running analysis.
+
+The tab's own local Outcome/Zone Type pills (for quick ad-hoc browsing)
+still work on top of whichever set this toggle produces - both layers of
+filtering compose rather than conflict.
+
+Verified with `AppTest`: narrowed the shared Outcome filter to "Profit"
+only (10 \u2192 2 zones on the Charts tab), then enabled the Trade Log
+toggle and confirmed it independently arrived at the identical "2 of 10
+trades match" with a caption explicitly listing `Outcome in ['Profit']` -
+the three tabs can't drift out of sync since they all read from the same
+`get_active_filters()` function. Also re-ran the full regression suite
+(Run Analysis, Metrics filtered toggle, ratio preset switch, Reset all
+filters, Batch Analysis) - zero exceptions across all of it.
