@@ -9,15 +9,16 @@ import streamlit as st
 from data_access import get_strategy_results
 from data_loading import load_multi_interval
 from ui.sidebar import render_sidebar
+from ui.style import inject_global_css, app_header
 from ui.tabs import charts_tab, metrics_tab, trade_log_tab, batch_tab, score_tab
 from zone_identification_multibase import NIFTY_TICKER, TIMEFRAMES
 
 st.set_page_config(page_title="SMC Scanner & Backtester", layout="wide", page_icon="📈")
 
 # Bump this on every delivered zip. If this string doesn't match what you
-# expect to see under the title, you're running stale files - re-unzip
+# expect to see in the header badges, you're running stale files - re-unzip
 # and replace the WHOLE folder rather than copying individual files over.
-APP_BUILD = "2026-09-11-zone-bounds-score-analysis-v1"
+APP_BUILD = "2026-09-12-ticker-picker-audit-v1"
 
 
 def _run_analysis_with_status(config: dict):
@@ -54,11 +55,19 @@ def _run_analysis_with_status(config: dict):
 
 
 def main():
-    st.title("📈 Supply & Demand Scanner")
-    st.caption(f"Build: {APP_BUILD} \u00b7 Streamlit {st.__version__}")
+    inject_global_css()
+
+    # Reserve the header's visual slot at the very top of the page now,
+    # but fill in its actual content later (after run-analysis below) so
+    # the status badge reflects what just happened in THIS script run
+    # rather than the previous one. st.empty() lets content appear later
+    # in code while still rendering in this earlier position on screen -
+    # otherwise the st.status() progress box below would render ABOVE
+    # the header instead of below it.
+    header_slot = st.empty()
 
     config = render_sidebar()
-    run_clicked = st.sidebar.button("Run Analysis", type="primary", use_container_width=True)
+    run_clicked = st.sidebar.button("▶ Run Analysis", type="primary", use_container_width=True)
 
     if run_clicked:
         if not config["ticker"]:
@@ -68,7 +77,6 @@ def main():
                 results = _run_analysis_with_status(config)
                 st.session_state["results"] = results
                 st.session_state["config"] = config
-
                 if getattr(results, "error", None):
                     st.toast(f"Analysis failed for {results.ticker}", icon="⚠️")
                 else:
@@ -79,6 +87,24 @@ def main():
 
     results = st.session_state.get("results")
     active_config = st.session_state.get("config", config)
+
+    status_badge = {"text": "No analysis yet", "muted": True}
+    if results is not None:
+        if getattr(results, "error", None):
+            status_badge = {"text": f"⚠ Error \u00b7 {results.ticker}"}
+        else:
+            status_badge = {"text": f"✓ {results.ticker} \u00b7 {results.analysis_timestamp}"}
+
+    with header_slot.container():
+        app_header(
+            title="📈 Supply & Demand Scanner",
+            subtitle="Smart Money Concepts zone detection, backtesting & scoring",
+            badges=[
+                {"text": f"Build {APP_BUILD.split('-', 1)[-1]}", "muted": True},
+                {"text": f"Streamlit {st.__version__}", "muted": True},
+                status_badge,
+            ],
+        )
 
     with st.expander("Diagnostics", expanded=False):
         st.caption(

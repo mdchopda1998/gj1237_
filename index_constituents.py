@@ -56,6 +56,78 @@ PRESETS = {
     "NIFTY 100": (NIFTY_50 + NIFTY_NEXT_50, f"{NIFTY_50_AS_OF} / {NIFTY_NEXT_50_AS_OF}"),
 }
 
+# Company names for the sidebar's search-by-name ticker picker - best-effort
+# for search/display convenience only, not guaranteed exact-legal-name
+# accuracy (a few post-demerger/rename entities are genuinely ambiguous,
+# see the NOTEs above). If a name looks wrong, the symbol itself is what
+# actually drives the analysis - use "Type ticker directly" for precision.
+COMPANY_NAMES = {
+    "ADANIENT": "Adani Enterprises", "ADANIPORTS": "Adani Ports & SEZ",
+    "APOLLOHOSP": "Apollo Hospitals", "ASIANPAINT": "Asian Paints",
+    "AXISBANK": "Axis Bank", "BAJAJ-AUTO": "Bajaj Auto",
+    "BAJFINANCE": "Bajaj Finance", "BAJAJFINSV": "Bajaj Finserv",
+    "BEL": "Bharat Electronics", "BHARTIARTL": "Bharti Airtel",
+    "CIPLA": "Cipla", "COALINDIA": "Coal India",
+    "DRREDDY": "Dr Reddy's Laboratories", "EICHERMOT": "Eicher Motors",
+    "ETERNAL": "Eternal (Zomato)", "GRASIM": "Grasim Industries",
+    "HCLTECH": "HCL Technologies", "HDFCBANK": "HDFC Bank",
+    "HDFCLIFE": "HDFC Life Insurance", "HINDALCO": "Hindalco Industries",
+    "HINDUNILVR": "Hindustan Unilever", "ICICIBANK": "ICICI Bank",
+    "INDIGO": "InterGlobe Aviation (IndiGo)", "INFY": "Infosys",
+    "ITC": "ITC Limited", "JIOFIN": "Jio Financial Services",
+    "JSWSTEEL": "JSW Steel", "KOTAKBANK": "Kotak Mahindra Bank",
+    "LT": "Larsen & Toubro", "M&M": "Mahindra & Mahindra",
+    "MARUTI": "Maruti Suzuki India", "MAXHEALTH": "Max Healthcare",
+    "NESTLEIND": "Nestle India", "NTPC": "NTPC Limited",
+    "ONGC": "Oil & Natural Gas Corporation", "POWERGRID": "Power Grid Corporation",
+    "RELIANCE": "Reliance Industries", "SBILIFE": "SBI Life Insurance",
+    "SHRIRAMFIN": "Shriram Finance", "SBIN": "State Bank of India",
+    "SUNPHARMA": "Sun Pharmaceutical Industries", "TCS": "Tata Consultancy Services",
+    "TATACONSUM": "Tata Consumer Products", "TMPV": "Tata Motors Passenger Vehicles",
+    "TATASTEEL": "Tata Steel", "TECHM": "Tech Mahindra",
+    "TITAN": "Titan Company", "TRENT": "Trent Limited",
+    "ULTRACEMCO": "UltraTech Cement", "WIPRO": "Wipro",
+    "ABB": "ABB India", "ADANIENSOL": "Adani Energy Solutions",
+    "ADANIGREEN": "Adani Green Energy", "ADANIPOWER": "Adani Power",
+    "AMBUJACEM": "Ambuja Cements", "BAJAJHLDNG": "Bajaj Holdings & Investment",
+    "BANKBARODA": "Bank of Baroda", "BPCL": "Bharat Petroleum",
+    "BRITANNIA": "Britannia Industries", "BOSCHLTD": "Bosch Limited",
+    "CANBK": "Canara Bank", "CGPOWER": "CG Power & Industrial Solutions",
+    "CHOLAFIN": "Cholamandalam Investment & Finance", "CUMMINSIND": "Cummins India",
+    "DIVISLAB": "Divi's Laboratories", "DLF": "DLF Limited",
+    "DMART": "Avenue Supermarts (DMart)", "GAIL": "GAIL India",
+    "GODREJCP": "Godrej Consumer Products", "HDFCAMC": "HDFC Asset Management",
+    "HAL": "Hindustan Aeronautics", "HINDZINC": "Hindustan Zinc",
+    "HYUNDAI": "Hyundai Motor India", "INDHOTEL": "Indian Hotels Company",
+    "IOC": "Indian Oil Corporation", "IRFC": "Indian Railway Finance Corporation",
+    "JINDALSTEL": "Jindal Steel & Power", "LODHA": "Macrotech Developers (Lodha)",
+    "LTIM": "LTIMindtree", "MAZDOCK": "Mazagon Dock Shipbuilders",
+    "MUTHOOTFIN": "Muthoot Finance", "PIDILITIND": "Pidilite Industries",
+    "PFC": "Power Finance Corporation", "PNB": "Punjab National Bank",
+    "RECLTD": "REC Limited", "MOTHERSON": "Samvardhana Motherson International",
+    "SHREECEM": "Shree Cement", "SIEMENS": "Siemens Limited",
+    "SOLARINDS": "Solar Industries India", "TATACAPITAL": "Tata Capital",
+    "TATAMOTORS": "Tata Motors", "TATAPOWER": "Tata Power",
+    "TORNTPHARM": "Torrent Pharmaceuticals", "TVSMOTOR": "TVS Motor Company",
+    "UNIONBANK": "Union Bank of India", "UNITDSPR": "United Spirits",
+    "VBL": "Varun Beverages", "VEDL": "Vedanta Limited",
+    "ZYDUSLIFE": "Zydus Lifesciences",
+}
+
+
+def search_universe() -> list:
+    """
+    (ticker, display_label) pairs for every NIFTY 50 + Next 50 constituent,
+    sorted by company name - feeds the sidebar's search-by-name picker.
+    """
+    symbols = NIFTY_50 + NIFTY_NEXT_50
+    pairs = []
+    for s in symbols:
+        ticker = f"{s}.NS"
+        name = COMPANY_NAMES.get(s, s)
+        pairs.append((ticker, f"{name} ({ticker})"))
+    return sorted(pairs, key=lambda pair: pair[1])
+
 
 def get_ticker_list(preset_name: str) -> list:
     symbols, _ = PRESETS[preset_name]

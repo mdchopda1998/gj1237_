@@ -1,29 +1,56 @@
+import math
+
 import streamlit as st
 import plotly.graph_objects as go
 
-from charting import filter_zones, filter_trade_log
+from charting import filter_zones, filter_trade_log, _theme_layout, FONT_STACK
 from filter_state import get_active_filters
 from zone_identification_multibase import recompute_metrics_for_subset
+from ui.style import PALETTE, section_header, stat_cards
+
+
+def _safe_num(x, default=0.0):
+    """
+    Returns `default` for None OR NaN, otherwise x unchanged.
+
+    Guards against the common `x or default` idiom silently doing the
+    wrong thing: NaN is truthy in Python, so `float('nan') or 0` evaluates
+    to NaN, not 0 - meaning a NaN metric (which can legitimately occur,
+    e.g. Profit Factor when trades are too few/one-sided) would previously
+    slip past that guard, then fail a numeric comparison (NaN compares
+    False to everything) and get colored/labeled as if it were a real bad
+    number rather than "no data". Doesn't fix any calculation - purely
+    protects display logic below from mislabeling NaN as a normal value.
+    """
+    if x is None:
+        return default
+    if isinstance(x, float) and math.isnan(x):
+        return default
+    return x
 
 
 def _composite_gauge(score) -> go.Figure:
-    score = score or 0
-    color = "#d62728" if score < 30 else ("#ff7f0e" if score < 60 else "#2ca02c")
+    p = PALETTE
+    score = _safe_num(score, 0)
+    color = p["bear"] if score < 30 else (p["warn"] if score < 60 else p["bull"])
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=score,
+        number={"font": {"color": p["text"], "family": FONT_STACK, "size": 36}},
         gauge={
-            "axis": {"range": [0, 100]},
-            "bar": {"color": color},
+            "axis": {"range": [0, 100], "tickcolor": p["text_muted"]},
+            "bar": {"color": color, "thickness": 0.75},
+            "bgcolor": "rgba(0,0,0,0)",
+            "borderwidth": 0,
             "steps": [
-                {"range": [0, 30], "color": "rgba(214,39,40,0.15)"},
-                {"range": [30, 60], "color": "rgba(255,127,14,0.15)"},
-                {"range": [60, 100], "color": "rgba(44,160,44,0.15)"},
+                {"range": [0, 30], "color": p["bear_soft"]},
+                {"range": [30, 60], "color": p["warn_soft"]},
+                {"range": [60, 100], "color": p["bull_soft"]},
             ],
         },
-        title={"text": "Composite Score"},
+        title={"text": "Composite Score", "font": {"color": p["text_muted"], "family": FONT_STACK, "size": 13}},
     ))
-    fig.update_layout(height=220, margin=dict(l=20, r=20, t=40, b=10))
+    _theme_layout(fig, height=220, margin=dict(l=20, r=20, t=40, b=10))
     return fig
 
 
@@ -33,33 +60,50 @@ def _equity_curve(trade_log) -> go.Figure:
     Date - pure presentation of numbers your real run_risk_management_simulation
     already computed, no new calculation.
     """
+    p = PALETTE
     ordered = trade_log.dropna(subset=["Exit Date"]).sort_values("Exit Date")
     fig = go.Figure(go.Scatter(
         x=ordered["Exit Date"], y=ordered["Capital_After_Trade"],
-        mode="lines+markers", line=dict(color="#1f77b4"),
+        mode="lines+markers", line=dict(color=p["brand"], width=2.5),
+        marker=dict(size=5, color=p["brand"]),
+        fill="tozeroy", fillcolor="rgba(79,140,255,0.10)",
     ))
-    fig.update_layout(title="Equity Curve (Capital After Trade)", height=300,
-                       xaxis_title=None, yaxis_title="₹", margin=dict(l=20, r=20, t=40, b=20))
+    _theme_layout(
+        fig,
+        title=dict(text="Equity Curve (Capital After Trade)", font=dict(size=14, family=FONT_STACK, color=p["text"])),
+        height=300, xaxis_title=None, yaxis_title="₹", margin=dict(l=20, r=20, t=40, b=20),
+    )
     return fig
 
 
 def _render_metric_cards(m: dict, trade_log=None):
     left, right = st.columns([1, 2])
     with left:
-        st.plotly_chart(_composite_gauge(m.get("Composite Score")), use_container_width=True)
+        st.plotly_chart(_composite_gauge(m.get("Composite Score")), use_container_width=True, key="composite_gauge_chart")
     with right:
-        top = st.columns(3)
-        top[0].metric("Win Rate", f"{m.get('Win Rate', 0):.1f}%")
-        top[1].metric("Profit Factor", round(m.get("Profit Factor"), 2) if m.get("Profit Factor") not in (None, float("inf")) else "∞")
-        top[2].metric("System Expectancy", round(m.get("System Expectancy", 0), 2))
-
-        mid = st.columns(3)
-        mid[0].metric("Total Trades", m.get("Total Trades"))
-        mid[1].metric("Demand / Supply Zones", f"{m.get('Demand Zones', 0)} / {m.get('Supply Zones', 0)}")
-        mid[2].metric("Net PNL", f"₹{m.get('Net PNL', 0):,.2f}")
+        pf = m.get("Profit Factor")
+        is_pf_nan = isinstance(pf, float) and math.isnan(pf)
+        pf_display = "∞" if pf in (None, float("inf")) else ("N/A" if is_pf_nan else f"{pf:.2f}")
+        win_rate = _safe_num(m.get("Win Rate"), 0)
+        expectancy = _safe_num(m.get("System Expectancy"), 0)
+        stat_cards([
+            {"label": "Win Rate", "value": f"{win_rate:.1f}%",
+             "color": "bull" if win_rate >= 50 else "bear"},
+            {"label": "Profit Factor", "value": pf_display,
+             "color": "bull" if _safe_num(pf, 0) >= 1 else "bear"},
+            {"label": "System Expectancy", "value": f"{expectancy:,.1f}",
+             "color": "bull" if expectancy >= 0 else "bear"},
+        ])
+        stat_cards([
+            {"label": "Total Trades", "value": m.get("Total Trades", 0), "color": "brand"},
+            {"label": "Demand / Supply Zones", "value": f"{m.get('Demand Zones', 0)} / {m.get('Supply Zones', 0)}",
+             "color": "accent"},
+            {"label": "Net PNL", "value": f"₹{m.get('Net PNL', 0):,.0f}",
+             "color": "bull" if m.get("Net PNL", 0) >= 0 else "bear"},
+        ])
 
     if trade_log is not None and not trade_log.empty and "Exit Date" in trade_log.columns:
-        st.plotly_chart(_equity_curve(trade_log), use_container_width=True)
+        st.plotly_chart(_equity_curve(trade_log), use_container_width=True, key="equity_curve_chart")
 
     with st.expander("Timing, fill-quality & scaled expectancy detail"):
         st.write(
@@ -100,9 +144,8 @@ def render(config: dict, results):
             st.warning("No resolved trades to compute metrics from.")
         return
 
-    st.subheader("Backtest Metrics")
-    if results.analysis_timestamp:
-        st.caption(f"Analysis last computed: {results.analysis_timestamp}")
+    section_header("📈", "Backtest Metrics",
+                    f"Analysis last computed: {results.analysis_timestamp}" if results.analysis_timestamp else "")
 
     use_filtered = st.toggle(
         "Compute metrics for currently filtered zones only (mirrors Chart Filters tab)",

@@ -2,6 +2,7 @@ import streamlit as st
 
 from charting import filter_zones, build_zone_figure, zones_display_table
 from filter_state import get_active_filters, trade_score_bool_columns, bool_filter_key
+from ui.style import section_header
 
 TF_LABELS = {"1d": "Daily", "1wk": "Weekly", "1mo": "Monthly"}
 SOURCE_NOTES = {
@@ -19,9 +20,10 @@ def render(config: dict, results):
         st.info("No charts to show - see the error above, or try different settings.")
         return
 
-    st.subheader(f"{config['ticker']} - Zones & Price Action")
-    if results.analysis_timestamp:
-        st.caption(f"Analysis last computed: {results.analysis_timestamp} (zone detection, backtest, scoring)")
+    section_header(
+        "📊", f"{config['ticker']} \u2014 Zones & Price Action",
+        f"Analysis last computed: {results.analysis_timestamp}" if results.analysis_timestamp else "",
+    )
 
     # --- Chart Filters: clearly separated from the analysis above ---------
     st.markdown("---")
@@ -124,7 +126,7 @@ def render(config: dict, results):
             fig = build_zone_figure(zone_df, config["ticker"], tf_label,
                                      filtered_zones=filtered, trade_score=score_df,
                                      trim_at_breach=st.session_state.get("trim_at_breach", True))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key=f"zone_chart_{tf_key}")
 
             total_zones = int(zone_df["Zone_Created"].sum()) if "Zone_Created" in zone_df.columns else 0
             source = results.data_sources.get(tf_key, "unknown")

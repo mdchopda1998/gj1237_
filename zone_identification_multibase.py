@@ -39,17 +39,30 @@ TIMEFRAMES = {"1d": "Daily", "1wk": "Weekly", "1mo": "Monthly"}
 
 
 def _synthetic_ohlc(ticker: str, start: date, end: date) -> pd.DataFrame:
-    """Last-resort fallback: used only if neither a saved CSV nor a live
-    yfinance fetch produced data (e.g. no network, bad ticker)."""
+    """
+    Last-resort fallback: used only if neither a saved CSV nor a live
+    yfinance fetch produced data (e.g. no network, bad ticker).
+
+    Uses a geometric (multiplicative) random walk, not an additive one -
+    real prices are always positive, and an additive walk can drift to
+    zero or negative over a long enough date range (confirmed: with the
+    default 2021-present range, ~1500 trading days, an additive walk's
+    cumulative stdev is large enough that this isn't even rare). A
+    non-positive Close then crashes np.log() in your backend's Kalman
+    filter (KalmanTrendFilter runs on log(Close)) with a RuntimeWarning
+    and garbage output - not a crash, but silently wrong. Geometric walk
+    is also just a more standard synthetic-price model regardless.
+    """
     idx = pd.date_range(start, end, freq="B")
     rng = np.random.default_rng(abs(hash(ticker)) % (2**32))
-    price = 100 + np.cumsum(rng.normal(0, 1.5, len(idx)))
+    log_returns = rng.normal(0, 0.015, len(idx))
+    price = 100 * np.exp(np.cumsum(log_returns))
     df = pd.DataFrame(index=idx)
     df.index.name = "Date"
-    df["Open"] = price + rng.normal(0, 0.5, len(idx))
     df["Close"] = price
-    df["High"] = df[["Open", "Close"]].max(axis=1) + rng.uniform(0, 1, len(idx))
-    df["Low"] = df[["Open", "Close"]].min(axis=1) - rng.uniform(0, 1, len(idx))
+    df["Open"] = price * np.exp(rng.normal(0, 0.004, len(idx)))
+    df["High"] = df[["Open", "Close"]].max(axis=1) * np.exp(rng.uniform(0, 0.01, len(idx)))
+    df["Low"] = df[["Open", "Close"]].min(axis=1) * np.exp(-rng.uniform(0, 0.01, len(idx)))
     df["Volume"] = rng.integers(1_000, 100_000, len(idx))
     return df
 
@@ -145,6 +158,7 @@ def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
     nifty_zones, nifty_sources = _build_nifty_zone_dfs(start_date, end_date, data_dir, ratio)
 
     data = {ticker: ticker_dfs}
+
     try:
         out = be.run_strategy_for_ticker(
             ticker, data, ratio,

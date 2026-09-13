@@ -1,5 +1,7 @@
 import streamlit as st
 
+from ui.style import section_header, stat_cards
+
 
 def _safe_options(series):
     """Sorted unique values as strings, NaN mapped to 'Unknown' - avoids
@@ -17,7 +19,7 @@ def render(config: dict, results):
         st.info("No trade log to show - see the error above.")
         return
 
-    st.subheader("Trade Log")
+    section_header("🧾", "Trade Log")
 
     trade_log = results.trade_log
     if trade_log is None or trade_log.empty:
@@ -49,11 +51,13 @@ def render(config: dict, results):
     ]
 
     if not filtered.empty:
-        s1, s2, s3 = st.columns(3)
-        s1.metric("Trades shown", len(filtered))
-        s2.metric("Net PNL (shown)", f"₹{filtered['Trade_PnL'].sum():,.2f}")
+        net_pnl = filtered["Trade_PnL"].sum()
         win_rate = 100 * (filtered["Outcome"] == "Profit").sum() / len(filtered)
-        s3.metric("Win Rate (shown)", f"{win_rate:.1f}%")
+        stat_cards([
+            {"label": "Trades Shown", "value": len(filtered), "color": "brand"},
+            {"label": "Net PNL (shown)", "value": f"₹{net_pnl:,.0f}", "color": "bull" if net_pnl >= 0 else "bear"},
+            {"label": "Win Rate (shown)", "value": f"{win_rate:.1f}%", "color": "bull" if win_rate >= 50 else "bear"},
+        ])
 
     column_config = {
         "Trade_PnL": st.column_config.NumberColumn("Trade P&L", format="₹%.2f"),

@@ -9,6 +9,33 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from ui.style import PALETTE
+
+FONT_STACK = "Inter, -apple-system, sans-serif"
+
+
+def _theme_layout(fig: go.Figure, **overrides) -> go.Figure:
+    """
+    Shared visual theme for every chart in the app - transparent
+    background (blends with the dark card it sits in), consistent font,
+    and subtle gridlines. Called at the end of every figure-building
+    function below so charts look like one coherent system rather than
+    each using Plotly's default styling.
+    """
+    p = PALETTE
+    layout = dict(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family=FONT_STACK, color=p["text"], size=12),
+        margin=dict(l=10, r=10, t=45, b=10),
+        legend=dict(bgcolor="rgba(0,0,0,0)"),
+    )
+    layout.update(overrides)
+    fig.update_layout(**layout)
+    fig.update_xaxes(gridcolor="rgba(139,147,167,0.12)", zerolinecolor="rgba(139,147,167,0.12)")
+    fig.update_yaxes(gridcolor="rgba(139,147,167,0.12)", zerolinecolor="rgba(139,147,167,0.12)")
+    return fig
+
 
 def _zone_bounds(zone_df: pd.DataFrame, zdate, zone: pd.Series, trim_at_breach: bool):
     """
@@ -141,6 +168,7 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
     """
     from plotly.subplots import make_subplots
 
+    p = PALETTE
     zones = filtered_zones if filtered_zones is not None else \
         zone_df[zone_df.get("Zone_Created", pd.Series(dtype=bool)) == True]  # noqa: E712
 
@@ -154,12 +182,14 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
     candle = go.Candlestick(
         x=zone_df.index, open=zone_df["Open"], high=zone_df["High"],
         low=zone_df["Low"], close=zone_df["Close"], name=ticker,
+        increasing_line_color=p["bull"], increasing_fillcolor=p["bull"],
+        decreasing_line_color=p["bear"], decreasing_fillcolor=p["bear"],
     )
     if has_volume:
         fig.add_trace(candle, row=1, col=1)
-        colors = ["rgba(0,180,0,0.5)" if c >= o else "rgba(200,0,0,0.5)"
-                  for o, c in zip(zone_df["Open"], zone_df["Close"])]
-        fig.add_trace(go.Bar(x=zone_df.index, y=zone_df["Volume"], marker_color=colors,
+        vol_colors = ["rgba(34,197,94,0.55)" if c >= o else "rgba(239,68,96,0.55)"
+                      for o, c in zip(zone_df["Open"], zone_df["Close"])]
+        fig.add_trace(go.Bar(x=zone_df.index, y=zone_df["Volume"], marker_color=vol_colors,
                               name="Volume", showlegend=False), row=2, col=1)
     else:
         fig.add_trace(candle)
@@ -167,7 +197,7 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
     for zdate, zone in zones.iterrows():
         is_demand = bool(zone["Is Demand"])
         x0, x1, is_breached, _ = _zone_bounds(zone_df, zdate, zone, trim_at_breach)
-        color = "rgba(0,180,0,0.15)" if is_demand else "rgba(200,0,0,0.15)"
+        color = p["bull_soft"] if is_demand else p["bear_soft"]
         label_parts = []
         if "Base Count" in zone.index and pd.notna(zone["Base Count"]):
             label_parts.append(f"BC{int(zone['Base Count'])}")
@@ -176,26 +206,29 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
             if pd.notna(strength):
                 label_parts.append(f"S{int(strength)}")
         if is_breached:
-            label_parts.append("(breached)")
+            label_parts.append("\u2715 breached")
         label = " ".join(label_parts)
 
         shape_kwargs = dict(row=1, col=1) if has_volume else {}
         fig.add_shape(
             type="rect", x0=x0, x1=x1,
             y0=zone["Distal"], y1=zone["Proximal"],
-            fillcolor=color, line=dict(width=0), layer="below",
+            fillcolor=color, line=dict(width=1, color=(p["bull"] if is_demand else p["bear"])),
+            layer="below",
             **shape_kwargs,
         )
         if label:
             fig.add_annotation(
                 x=x0, y=zone["Proximal"], text=label, showarrow=False,
-                font=dict(size=9, color="green" if is_demand else "red"),
+                font=dict(size=9, family=FONT_STACK, color=p["bull"] if is_demand else p["bear"]),
                 xanchor="left", yanchor="bottom",
                 **shape_kwargs,
             )
 
-    fig.update_layout(
-        title=f"{ticker} - {timeframe_label} zones ({len(zones)} shown)",
+    _theme_layout(
+        fig,
+        title=dict(text=f"{ticker} \u00b7 {timeframe_label} zones ({len(zones)} shown)",
+                   font=dict(size=15, family=FONT_STACK, color=p["text"])),
         xaxis_rangeslider_visible=False, height=560 if has_volume else 520,
         showlegend=False,
     )

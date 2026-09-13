@@ -11,6 +11,7 @@ import pandas as pd
 
 from data_access import get_strategy_results
 from index_constituents import PRESETS, get_ticker_list, get_as_of
+from ui.style import section_header, stat_cards
 
 
 def _tickers_from_source(source: str, custom_text: str, uploaded_file) -> list:
@@ -33,13 +34,12 @@ def _tickers_from_source(source: str, custom_text: str, uploaded_file) -> list:
 
 
 def render(config: dict):
-    st.subheader("🗂️ Batch Analysis")
-    st.caption(
-        "Runs the exact same analysis as the single-ticker tabs, once per "
-        "selected ticker, using the current sidebar settings (date range, "
-        "risk %, capital, ratio config). Results combine into one table "
-        "with Ticker as a column - your real backend logic is unchanged, "
-        "this just loops the same call."
+    section_header(
+        "🗂️", "Batch Analysis",
+        "Runs the exact same analysis as the single-ticker tabs, once per selected ticker, "
+        "using the current sidebar settings (date range, risk %, capital, ratio config). "
+        "Results combine into one table with Ticker as a column - your real backend logic "
+        "is unchanged, this just loops the same call.",
     )
 
     source = st.radio(
@@ -142,10 +142,11 @@ def render(config: dict):
     ok_count = int((table["Status"] == "OK").sum())
     no_trade_count = int((table["Status"] == "No Trades").sum())
     err_count = int((table["Status"] == "Error").sum())
-    s1, s2, s3 = st.columns(3)
-    s1.metric("Successful", ok_count)
-    s2.metric("No trades", no_trade_count)
-    s3.metric("Errors", err_count)
+    stat_cards([
+        {"label": "Successful", "value": ok_count, "color": "bull"},
+        {"label": "No Trades", "value": no_trade_count, "color": "warn"},
+        {"label": "Errors", "value": err_count, "color": "bear"},
+    ])
 
     f1, f2 = st.columns([2, 2])
     with f1:

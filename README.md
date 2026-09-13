@@ -388,3 +388,217 @@ sensible signal on the SAIL.NS data (e.g. `BOS=True` zones showing a
 claim about what's generally true, just evidence the computation works).
 All 5 tabs checked via `AppTest` with zero exceptions, including toggling
 the new breach-trim control off and back on.
+
+## Fixed: ratio preset dropdown didn't actually update the sliders
+
+### The bug
+
+Once a Streamlit widget's `key` exists in `session_state` (which happens
+after its first render), the widget **ignores its `value=`/`index=`
+argument on every subsequent rerun** - only `session_state[key]` matters
+from then on. The "Advanced: edit TR/ATR" sliders were computing their
+displayed default from the currently-selected preset (`float(tf_ratio[...])`)
+every render, but since their `key`s already existed in `session_state`
+after the first render, that computed value was silently ignored - so
+switching from "Standard" to "SAIL_Backtested" (or any other preset) never
+actually changed what the sliders showed or what got sent to your backend.
+
+### The fix
+
+`ui/sidebar.py` now explicitly writes the selected preset's values into
+the sliders' `session_state` keys **before** the sliders are instantiated,
+but only on a genuine preset change (tracked via `_last_ratio_preset`) -
+not on every rerun, which would otherwise silently overwrite any manual
+edits you'd made. Two related pieces:
+
+- **Editing any Daily slider by hand automatically switches the preset
+  dropdown to "Custom"** via an `on_change` callback - visible
+  confirmation that your edited values, not the named preset, are what's
+  now in effect. This is the "updated values are considered final" part:
+  whatever the sliders show is always what's sent to `run_strategy_for_ticker`,
+  regardless of which label happens to be selected.
+- The Advanced expander now shows a caption stating which preset (or
+  "Custom") the visible values reflect.
+
+Also cleaned up two related Streamlit policy warnings ("widget was created
+with a default value but also had its value set via the Session State
+API") that the above change surfaced - both the ratio-preset selectbox and
+the sliders now only pass `index=`/`value=` on their very first render,
+relying on `session_state` afterward, which is Streamlit's recommended
+pattern for programmatically-controlled widgets.
+
+Verified with `AppTest`: confirmed switching to `SAIL_Backtested` actually
+changes the Base TR/ATR slider to 1.2 and Explosive Body/TR to 0.6 (previously
+these NEVER changed regardless of preset - the core bug); confirmed manually
+editing a slider to 0.9 both keeps 0.9 and flips the dropdown to "Custom";
+confirmed switching to a different preset afterward (`Tight_Base`) still
+correctly re-syncs; and ran a full analysis end-to-end with the edited
+ratio with zero exceptions and zero warnings.
+
+## UI/UX Redesign — modern dark "quant dashboard" theme
+
+Complete visual overhaul. **Zero changes to analysis logic** - every file
+touched here is presentation-only (`ui/`, `charting.py`'s color/layout
+code, `app.py`'s layout). `smc_backend.py`, `zone_identification_multibase.py`'s
+computation, `ratio_config.py`, `data_loading.py`, `filter_state.py`, and
+`score_analysis.py` are untouched in behavior.
+
+### Design system (`ui/style.py`)
+
+A single source of truth for color, typography, and reusable components,
+so every tab looks like one coherent product instead of five separately
+styled pages:
+
+**Palette** — consistent semantic color language used everywhere (charts,
+tables, cards, badges):
+| Color | Hex | Meaning |
+|---|---|---|
+| Green (`bull`) | `#22C55E` | demand zones, profitable trades, bullish candles, "True"/OK |
+| Red (`bear`) | `#EF4460` | supply zones, losing trades, bearish candles, errors |
+| Amber (`warn`) | `#F5A623` | breached zones, "No Trades" status, caution |
+| Blue (`brand`) | `#4F8CFF` | primary actions, equity curve, neutral emphasis |
+| Cyan (`accent`) | `#22D3EE` | secondary chart highlights |
+
+Background is a deep charcoal/navy (`#0B0F19` page, `#171E2C` cards) -
+typography is **Inter** (via Google Fonts), a font built for dashboard/UI
+legibility at small sizes.
+
+**Components** (`ui/style.py`): `inject_global_css()` (fonts, card styling,
+tab styling, button styling, hides Streamlit's footer), `app_header()`
+(the gradient banner replacing the plain title), `section_header()`
+(consistent icon+title+subtitle used at the top of every tab), `stat_cards()`
+(color-accented card grid replacing plain `st.metric` calls throughout).
+
+**`.streamlit/config.toml`** sets the native Streamlit theme (this is what
+themes buttons, sliders, checkboxes, the sidebar, etc. - CSS alone can't
+reach all of that reliably).
+
+### Chart theming (`charting.py`)
+
+New `_theme_layout()` helper applied to every chart in the app:
+transparent background (blends into the dark card behind it), Inter font,
+subtle gridlines. Specific changes:
+- Candlesticks: green/red now match the same `bull`/`bear` used for zones
+  and P&L everywhere else, instead of Plotly's default blue/orange - the
+  whole app now reads with one consistent color language.
+- Zone rectangles: added a colored border (not just fill) matching
+  demand/supply, and breached zones are labeled "✕ breached" instead of
+  "(breached)".
+- Volume bars, equity curve (now with a soft gradient fill under the
+  line), composite score gauge, tornado chart, breakdown charts - all
+  recolored to the same palette.
+
+### Layout changes
+
+- **Header banner**: gradient card replacing the plain `st.title`, with
+  live status badges (build version, Streamlit version, last-analysis
+  ticker/timestamp or "No analysis yet").
+- **Sidebar**: small brand mark at the top, section labels standardized.
+- **Metric displays**: `st.metric` grids replaced with `stat_cards()` -
+  color-coded left border (green/red based on whether the number is
+  good/bad, e.g. Net PNL negative shows red) across Metrics, Trade Log,
+  and Batch Analysis tabs.
+- Diagnostics expander demoted (still there, just less visually
+  prominent now that the header badges show status at a glance).
+
+### Bugs found and fixed while verifying the redesign
+
+Large multi-line edits during the restyle left duplicated function bodies
+in three files (`metrics_tab.py`, `score_tab.py`, `trade_log_tab.py`) -
+each had its entire render logic appear twice, which is invisible in a
+code review but crashes at runtime with `StreamlitDuplicateElementKey` the
+moment both copies of a same-keyed widget actually execute in one script
+run. One instance (`metrics_tab.py`'s duplicate) only surfaced when
+specifically testing the "filtered metrics" toggle - a normal smoke test
+never reached the duplicated code path. Also hardened every `st.plotly_chart`
+call app-wide with an explicit unique `key=`, since Streamlit's
+auto-generated chart IDs can collide when two charts have similar
+structure (this is what surfaced the score_tab duplication in the first
+place).
+
+Verified with `streamlit.testing.v1.AppTest` end-to-end: initial load,
+Run Analysis, ratio preset switch, manual slider edit, filtered-metrics
+toggle on/off, breach-trim toggle, chart filter interaction, batch
+analysis run, and drill-down - ten checks, zero exceptions across all of
+them.
+
+## Rendering-bug audit + defaults/ticker-picker update
+
+### Systematic rendering-bug sweep
+
+Built a precise duplicate-block detector (distinguishes genuine distant
+repeats from trivial overlapping-window noise) and ran it across every
+file. Confirmed **zero remaining duplicate-block bugs** in any of our own
+code (the three found and fixed previously were the only instances); the
+only hits were legitimate, original, untouched patterns inside
+`smc_backend.py` itself (e.g. `identify_zones()` and
+`identity_zones_with_multibase()` sharing a similar preprocessing
+pipeline header by original design).
+
+Also checked and confirmed safe (no crash): `NumberColumn` with `inf`/`NaN`
+values, `DateColumn` with mixed `None`/`Timestamp` values - unlike
+`ProgressColumn` (fixed earlier), these don't have strict bounds
+validation.
+
+**Two real bugs found and fixed:**
+
+1. **HTML injection via ticker names.** `app_header()`, `section_header()`,
+   and `stat_cards()` interpolated dynamic text (ticker names, e.g. our
+   own `M&M.NS` from the NIFTY 50 preset, or anything typed into the
+   ticker box) directly into raw HTML via `unsafe_allow_html=True`, with
+   no escaping. Fixed: all dynamic content now goes through
+   `html.escape()` before insertion. Verified `M&M.NS` now renders as the
+   properly-escaped `M&amp;M.NS` in the markup.
+
+2. **Header status badge was one run behind.** The header banner's status
+   badge (analysis success/error/ticker) was computed and rendered
+   *before* the "Run Analysis" logic executed in the same script run, so
+   it always showed the *previous* run's state rather than the one that
+   just completed. Fixed using `st.empty()` as a placeholder: the header's
+   visual slot is reserved at the top of the page immediately, but its
+   content is filled in *after* the analysis logic runs later in the same
+   script - so the `st.status()` progress box still appears in its
+   correct position (below the header, above the tabs) while the badge
+   itself is always current. Verified: badge now shows `✓ SAIL.NS · <fresh
+   timestamp>` immediately after clicking Run Analysis, in the same run.
+
+3. **Synthetic fallback OHLC could go non-positive over long date ranges**
+   (found incidentally while testing the new default date range below).
+   The synthetic-data generator used an *additive* random walk
+   (`100 + cumsum(normal)`); over ~1,500 trading days (the new 2021-present
+   default), its cumulative standard deviation is large enough that
+   hitting zero or negative prices isn't even rare. A non-positive Close
+   then fails `np.log()` in your backend's Kalman filter
+   (`KalmanTrendFilter` runs on `log(Close)`) - not a crash, but a silent
+   `RuntimeWarning` and garbage trend output. Fixed by switching to a
+   *geometric* (multiplicative) random walk, which is positive by
+   construction and also just a more standard synthetic-price model.
+   Verified: 1,486 rows generated over the full default range, zero
+   non-positive prices, and the `RuntimeWarning` no longer appears.
+
+### Sidebar defaults
+
+- **Date Range** default changed to **2021-01-01 → today** (was "3 years
+  ago → today").
+- **Initial Capital** default changed to **₹100,000** (was ₹500,000).
+
+### New: search-by-company-name ticker picker
+
+`index_constituents.py` now also ships a `COMPANY_NAMES` map (NIFTY 50 +
+Next 50, ~99 companies - best-effort names for search convenience, not
+guaranteed exact legal names for the handful of recently-renamed/demerged
+entities already flagged elsewhere in that file).
+
+The sidebar's ticker field is now a **"Find stock by"** choice:
+- **Search company name** (default) - a searchable dropdown
+  (Streamlit's `selectbox` supports type-to-filter) showing
+  "Company Name (TICKER.NS)", defaulting to Reliance Industries. Covers
+  the ~99 largest NSE-listed companies without needing to know any ticker
+  symbol at all.
+- **Type ticker directly** - the original free-text field (defaults to
+  `SAIL.NS`), for anything outside that universe.
+
+Verified both modes end-to-end with `AppTest`: default search mode
+resolves to `RELIANCE.NS` and runs cleanly; switching to direct-entry mode
+correctly shows/uses `SAIL.NS`; both produce zero exceptions through a
+full Run Analysis.
