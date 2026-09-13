@@ -602,3 +602,63 @@ Verified both modes end-to-end with `AppTest`: default search mode
 resolves to `RELIANCE.NS` and runs cleanly; switching to direct-entry mode
 correctly shows/uses `SAIL.NS`; both produce zero exceptions through a
 full Run Analysis.
+
+## Fixed: stat cards showing raw HTML text instead of rendering
+
+### Root cause
+
+`stat_cards()` (and `app_header()`, same pattern) built their HTML using
+a **multi-line f-string indented to match the surrounding Python code**:
+
+```python
+html_out += f"""
+        <div class="stat-card" ...>
+            <div class="stat-label">...
+```
+
+Every generated HTML line inherited 8+ literal leading spaces from the
+source code's own indentation. Markdown treats any line indented 4+
+spaces as a **literal code block**, not something to parse as HTML - so
+instead of rendering styled cards, the browser showed the raw
+`<div class="stat-card">...` tags as plain text. This is exactly why it
+appeared next to "Win Rate" and "Total Trades" in the Metrics tab, and
+next to "Trades Shown" in the Trade Log tab - both use `stat_cards()`.
+`section_header()` was unaffected because it was already a single-line
+string with no indentation.
+
+This bug existed from the moment `stat_cards()`/`app_header()` were first
+introduced, but `AppTest` only checks for *exceptions*, not visual
+correctness - a malformed-but-non-crashing render like this doesn't throw,
+so automated testing never caught it. Confirms the automated test suite
+catches crashes, not "renders but looks wrong."
+
+### Fix
+
+Both functions now build their HTML as **single-line concatenated
+strings with zero leading whitespace** (string concatenation instead of
+an indented triple-quoted f-string). Verified directly: every stat-card
+`st.markdown()` call now produces one unbroken line with no leading
+spaces on any line.
+
+### Also restored/added the requested metrics
+
+- **Net PNL** was actually still present in the code the whole time - it
+  was just unreadable, buried in the broken HTML text alongside
+  everything else. Now displays correctly.
+- **Final Capital** is a genuinely new card: reads the last
+  `Capital_After_Trade` value from your real `run_risk_management_simulation`
+  output (sorted by Exit Date) - no new calculation, just surfacing a
+  number your backend already computes but that wasn't shown anywhere as
+  its own metric before.
+- Metrics tab layout is now three rows: Win Rate / Profit Factor / System
+  Expectancy, then **Final Capital / Net PNL / Total Trades**, then
+  Demand Zones / Supply Zones (split into two cards instead of one
+  combined "X / Y" card, for clearer at-a-glance reading).
+
+Verified with `AppTest`: ran a full analysis, inspected every rendered
+`stat-card` markdown block directly, confirmed each is a single line with
+no leading whitespace (the only "indented" match left in the whole page
+is the global CSS `<style>` block, which is supposed to have indentation
+- that's normal CSS, not a bug), and confirmed "Final Capital", "Net
+PNL", "Total Trades", and "Win Rate" all appear as expected text in the
+rendered output.

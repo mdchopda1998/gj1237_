@@ -145,20 +145,25 @@ def app_header(title: str, subtitle: str, badges: list):
     NIFTY 50 preset list, or whatever a person typed into the Ticker box),
     and this renders via unsafe_allow_html, so an un-escaped '&', '<', etc.
     would produce broken or unexpected markup.
+
+    Built as a single concatenated string with NO leading whitespace on
+    any line - a multi-line f-string indented to match the surrounding
+    Python code (as this used to be) puts 4+ literal leading spaces on
+    each HTML line, and Markdown renders any line indented 4+ spaces as a
+    literal code block instead of parsing it as HTML.
     """
     badge_html = "".join(
         f'<span class="badge{" muted" if b.get("muted") else ""}">{_html.escape(str(b["text"]))}</span>'
         for b in badges
     )
-    st.markdown(f"""
-    <div class="app-header">
-        <div>
-            <h1>{_html.escape(title)}</h1>
-            <div class="subtitle">{_html.escape(subtitle)}</div>
-        </div>
-        <div class="badge-row">{badge_html}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    html_out = (
+        '<div class="app-header">'
+        f'<div><h1>{_html.escape(title)}</h1>'
+        f'<div class="subtitle">{_html.escape(subtitle)}</div></div>'
+        f'<div class="badge-row">{badge_html}</div>'
+        '</div>'
+    )
+    st.markdown(html_out, unsafe_allow_html=True)
 
 
 def section_header(icon: str, title: str, subtitle: str = ""):
@@ -174,20 +179,26 @@ def stat_cards(cards: list):
     optional 'delta' (str, already formatted, e.g. '+2.4%').
     Renders a responsive grid of styled cards in one st.markdown call.
     label/value/delta are HTML-escaped - see app_header()'s docstring for why.
+
+    Built as single-line concatenated strings with NO leading whitespace -
+    see app_header()'s docstring for why that matters (this was the actual
+    bug: raw "<div..." text was showing up instead of rendered cards,
+    because the previous version used an indented multi-line f-string).
     """
     p = PALETTE
-    html_out = '<div class="stat-grid">'
+    parts = ['<div class="stat-grid">']
     for c in cards:
         color = p.get(c.get("color", "brand"), p["brand"])
         delta_html = ""
         if c.get("delta"):
             delta_color = c.get("delta_color", color)
             delta_html = f'<div class="stat-delta" style="color:{delta_color}">{_html.escape(str(c["delta"]))}</div>'
-        html_out += f"""
-        <div class="stat-card" style="--accent-color:{color}">
-            <div class="stat-label">{_html.escape(str(c['label']))}</div>
-            <div class="stat-value">{_html.escape(str(c['value']))}</div>
-            {delta_html}
-        </div>"""
-    html_out += "</div>"
-    st.markdown(html_out, unsafe_allow_html=True)
+        parts.append(
+            f'<div class="stat-card" style="--accent-color:{color}">'
+            f'<div class="stat-label">{_html.escape(str(c["label"]))}</div>'
+            f'<div class="stat-value">{_html.escape(str(c["value"]))}</div>'
+            f'{delta_html}'
+            '</div>'
+        )
+    parts.append('</div>')
+    st.markdown("".join(parts), unsafe_allow_html=True)

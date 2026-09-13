@@ -86,6 +86,17 @@ def _render_metric_cards(m: dict, trade_log=None):
         pf_display = "∞" if pf in (None, float("inf")) else ("N/A" if is_pf_nan else f"{pf:.2f}")
         win_rate = _safe_num(m.get("Win Rate"), 0)
         expectancy = _safe_num(m.get("System Expectancy"), 0)
+        net_pnl = _safe_num(m.get("Net PNL"), 0)
+
+        # Final Capital = the last Capital_After_Trade in the trade log
+        # (sorted by Exit Date) - your real run_risk_management_simulation
+        # already computes this per-trade; this just reads the last value.
+        final_capital = None
+        if trade_log is not None and not trade_log.empty and "Capital_After_Trade" in trade_log.columns:
+            ordered_for_capital = trade_log.dropna(subset=["Exit Date"]).sort_values("Exit Date")
+            if not ordered_for_capital.empty:
+                final_capital = ordered_for_capital["Capital_After_Trade"].iloc[-1]
+
         stat_cards([
             {"label": "Win Rate", "value": f"{win_rate:.1f}%",
              "color": "bull" if win_rate >= 50 else "bear"},
@@ -95,11 +106,15 @@ def _render_metric_cards(m: dict, trade_log=None):
              "color": "bull" if expectancy >= 0 else "bear"},
         ])
         stat_cards([
-            {"label": "Total Trades", "value": m.get("Total Trades", 0), "color": "brand"},
-            {"label": "Demand / Supply Zones", "value": f"{m.get('Demand Zones', 0)} / {m.get('Supply Zones', 0)}",
-             "color": "accent"},
-            {"label": "Net PNL", "value": f"₹{m.get('Net PNL', 0):,.0f}",
-             "color": "bull" if m.get("Net PNL", 0) >= 0 else "bear"},
+            {"label": "Final Capital", "value": f"₹{final_capital:,.0f}" if final_capital is not None else "N/A",
+             "color": "brand"},
+            {"label": "Net PNL", "value": f"₹{net_pnl:,.0f}",
+             "color": "bull" if net_pnl >= 0 else "bear"},
+            {"label": "Total Trades", "value": m.get("Total Trades", 0), "color": "accent"},
+        ])
+        stat_cards([
+            {"label": "Demand Zones", "value": m.get("Demand Zones", 0), "color": "bull"},
+            {"label": "Supply Zones", "value": m.get("Supply Zones", 0), "color": "bear"},
         ])
 
     if trade_log is not None and not trade_log.empty and "Exit Date" in trade_log.columns:
