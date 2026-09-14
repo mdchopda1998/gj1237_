@@ -3,6 +3,7 @@ from datetime import date
 
 from ratio_config import default_ratio, resolve_gen_ratio, DAILY_PRESETS
 from index_constituents import search_universe
+from ui.style import icon_span
 
 
 def _apply_preset_to_session_state(preset_name: str):
@@ -32,7 +33,7 @@ def _mark_custom():
 
 
 def _render_ratio_controls(ratio: dict) -> dict:
-    st.sidebar.markdown("##### 🧮 Zone Detection Ratios")
+    st.sidebar.markdown(f"##### {icon_span('tune', size=16)} Zone Detection Ratios", unsafe_allow_html=True)
     st.sidebar.caption(
         "Your real backend currently only reads ratio['GEN.NS'][interval] "
         "regardless of ticker - these controls edit that shared config."
@@ -104,10 +105,17 @@ def _render_ticker_picker() -> str:
     selectbox already supports type-to-filter, so "search by name" is a
     real search, not just a long dropdown to scroll through.
     """
-    mode = st.sidebar.radio(
-        "Find stock by", ["Search company name", "Type ticker directly"],
-        horizontal=True, key="ticker_input_mode",
-    )
+    if hasattr(st, "pills"):
+        mode = st.sidebar.pills(
+            "Find stock by", ["Search company name", "Type ticker directly"],
+            default="Search company name", key="ticker_input_mode",
+        )
+        mode = mode or "Search company name"
+    else:
+        mode = st.sidebar.radio(
+            "Find stock by", ["Search company name", "Type ticker directly"],
+            horizontal=True, key="ticker_input_mode",
+        )
 
     if mode == "Search company name":
         universe = search_universe()  # [(ticker, "Company Name (TICKER.NS)"), ...]
@@ -131,16 +139,14 @@ def _render_ticker_picker() -> str:
 
 
 def render_sidebar() -> dict:
-    st.sidebar.markdown(
-        """
-        <div style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0 1rem 0;">
-            <span style="font-size:1.4rem;">📈</span>
-            <span style="font-size:1.05rem;font-weight:800;letter-spacing:-0.01em;">SMC Scanner</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    brand_html = (
+        '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0 1rem 0;">'
+        f'{icon_span("candlestick_chart", size=22, color="#3861FB")}'
+        '<span style="font-size:1.05rem;font-weight:800;letter-spacing:-0.01em;">SMC Scanner</span>'
+        '</div>'
     )
-    st.sidebar.markdown("##### ⚙️ Configuration")
+    st.sidebar.markdown(brand_html, unsafe_allow_html=True)
+    st.sidebar.markdown(f"##### {icon_span('settings', size=16)} Configuration", unsafe_allow_html=True)
 
     ticker = _render_ticker_picker()
 
@@ -162,7 +168,7 @@ def render_sidebar() -> dict:
 
     st.sidebar.divider()
 
-    with st.sidebar.expander("📁 Data source", expanded=False):
+    with st.sidebar.expander("Data source", icon=":material/folder_open:", expanded=False):
         data_dir = st.text_input(
             "Local CSV folder", value="data",
             help="Checked first, per ticker/interval (e.g. data/SAIL_NS_1d.csv). "
@@ -173,7 +179,7 @@ def render_sidebar() -> dict:
     ratio = _render_ratio_controls(default_ratio())
 
     st.sidebar.divider()
-    if st.sidebar.button("↺ Reset all filters", use_container_width=True,
+    if st.sidebar.button("Reset all filters", icon=":material/restart_alt:", use_container_width=True,
                           help="Clears chart/table filter selections (Base Count, Zone Type, Strength, etc). "
                                "Does not re-run analysis or change these sidebar settings."):
         for key in list(st.session_state.keys()):
@@ -183,7 +189,7 @@ def render_sidebar() -> dict:
                 del st.session_state[key]
         st.rerun()
 
-    with st.sidebar.expander("ℹ️ About this app", expanded=False):
+    with st.sidebar.expander("About this app", icon=":material/info:", expanded=False):
         st.caption(
             "SMC (Smart Money Concepts) demand/supply zone scanner and backtester "
             "for NSE equities. Zone detection, backtesting, and scoring run your "

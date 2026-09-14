@@ -66,7 +66,7 @@ def _equity_curve(trade_log) -> go.Figure:
         x=ordered["Exit Date"], y=ordered["Capital_After_Trade"],
         mode="lines+markers", line=dict(color=p["brand"], width=2.5),
         marker=dict(size=5, color=p["brand"]),
-        fill="tozeroy", fillcolor="rgba(79,140,255,0.10)",
+        fill="tozeroy", fillcolor="rgba(56,97,251,0.10)",
     ))
     _theme_layout(
         fig,
@@ -137,8 +137,9 @@ def _render_metric_cards(m: dict, trade_log=None):
 
     import json
     st.download_button(
-        "⬇ Download metrics as JSON", json.dumps(m, indent=2, default=str).encode("utf-8"),
+        "Download metrics as JSON", json.dumps(m, indent=2, default=str).encode("utf-8"),
         file_name="backtest_metrics.json", mime="application/json", key="download_metrics_json",
+        icon=":material/download:",
     )
 
 
@@ -159,7 +160,7 @@ def render(config: dict, results):
             st.warning("No resolved trades to compute metrics from.")
         return
 
-    section_header("📈", "Backtest Metrics",
+    section_header("monitoring", "Backtest Metrics",
                     f"Analysis last computed: {results.analysis_timestamp}" if results.analysis_timestamp else "")
 
     use_filtered = st.toggle(

@@ -17,10 +17,11 @@ FONT_STACK = "Inter, -apple-system, sans-serif"
 def _theme_layout(fig: go.Figure, **overrides) -> go.Figure:
     """
     Shared visual theme for every chart in the app - transparent
-    background (blends with the dark card it sits in), consistent font,
-    and subtle gridlines. Called at the end of every figure-building
-    function below so charts look like one coherent system rather than
-    each using Plotly's default styling.
+    background (blends with the white card it sits in), consistent font,
+    and thin light-grey gridlines (Kite/Groww convention: gridlines
+    provide structure without competing with the data). Called at the
+    end of every figure-building function below so charts look like one
+    coherent system rather than each using Plotly's default styling.
     """
     p = PALETTE
     layout = dict(
@@ -32,8 +33,8 @@ def _theme_layout(fig: go.Figure, **overrides) -> go.Figure:
     )
     layout.update(overrides)
     fig.update_layout(**layout)
-    fig.update_xaxes(gridcolor="rgba(139,147,167,0.12)", zerolinecolor="rgba(139,147,167,0.12)")
-    fig.update_yaxes(gridcolor="rgba(139,147,167,0.12)", zerolinecolor="rgba(139,147,167,0.12)")
+    fig.update_xaxes(gridcolor="rgba(15,23,41,0.06)", zerolinecolor="rgba(15,23,41,0.10)")
+    fig.update_yaxes(gridcolor="rgba(15,23,41,0.06)", zerolinecolor="rgba(15,23,41,0.10)")
     return fig
 
 
@@ -204,7 +205,7 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
     )
     if has_volume:
         fig.add_trace(candle, row=1, col=1)
-        vol_colors = ["rgba(34,197,94,0.55)" if c >= o else "rgba(239,68,96,0.55)"
+        vol_colors = ["rgba(22,163,74,0.55)" if c >= o else "rgba(229,72,77,0.55)"
                       for o, c in zip(zone_df["Open"], zone_df["Close"])]
         fig.add_trace(go.Bar(x=zone_df.index, y=zone_df["Volume"], marker_color=vol_colors,
                               name="Volume", showlegend=False), row=2, col=1)
@@ -214,7 +215,7 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
     for zdate, zone in zones.iterrows():
         is_demand = bool(zone["Is Demand"])
         x0, x1, is_breached, _ = _zone_bounds(zone_df, zdate, zone, trim_at_breach)
-        color = p["bull_soft"] if is_demand else p["bear_soft"]
+        color = p["bull_overlay"] if is_demand else p["bear_overlay"]
         label_parts = []
         if "Base Count" in zone.index and pd.notna(zone["Base Count"]):
             label_parts.append(f"BC{int(zone['Base Count'])}")

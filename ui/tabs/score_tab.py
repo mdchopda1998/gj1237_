@@ -67,7 +67,7 @@ def render(config: dict, results):
         return
 
     section_header(
-        "📐", "How Metrics Vary With Trade Score",
+        "bar_chart", "How Metrics Vary With Trade Score",
         "Re-aggregates your already-computed trade_log joined with trade_score (df_ts) - "
         "Strength, Base Count, and every boolean score flag (Gapped, BOS, OB, Sweep, HTF "
         "Support, etc.) - to show which factors actually correlate with Win Rate and PnL. "
@@ -118,8 +118,8 @@ def render(config: dict, results):
             }
             st.dataframe(summary, use_container_width=True, hide_index=True, column_config=column_config)
             st.download_button(
-                "⬇ Download flag comparison as CSV",
+                "Download flag comparison as CSV",
                 summary.to_csv(index=False).encode("utf-8"),
                 file_name=f"{config.get('ticker', 'score')}_flag_comparison.csv",
-                mime="text/csv", key="download_flag_comparison",
+                mime="text/csv", key="download_flag_comparison", icon=":material/download:",
             )

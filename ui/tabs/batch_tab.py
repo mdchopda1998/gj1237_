@@ -35,7 +35,7 @@ def _tickers_from_source(source: str, custom_text: str, uploaded_file) -> list:
 
 def render(config: dict):
     section_header(
-        "🗂️", "Batch Analysis",
+        "grid_view", "Batch Analysis",
         "Runs the exact same analysis as the single-ticker tabs, once per selected ticker, "
         "using the current sidebar settings (date range, risk %, capital, ratio config). "
         "Results combine into one table with Ticker as a column - your real backend logic "
@@ -84,9 +84,9 @@ def render(config: dict):
         )
 
     b1, b2 = st.columns([1, 1])
-    run_batch = b1.button("▶ Run Batch Analysis", type="primary", disabled=(len(tickers) == 0),
-                           use_container_width=True)
-    if b2.button("🗑 Clear batch results", use_container_width=True):
+    run_batch = b1.button("Run Batch Analysis", type="primary", icon=":material/play_arrow:",
+                           disabled=(len(tickers) == 0), use_container_width=True)
+    if b2.button("Clear batch results", icon=":material/delete:", use_container_width=True):
         for key in ("batch_results", "batch_table", "batch_timestamp"):
             st.session_state.pop(key, None)
         st.rerun()
@@ -129,7 +129,7 @@ def render(config: dict):
         st.session_state["batch_table"] = pd.DataFrame(rows)
         import datetime
         st.session_state["batch_timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        st.toast(f"Batch analysis complete: {len(tickers)} ticker(s)", icon="✅")
+        st.toast(f"Batch analysis complete: {len(tickers)} ticker(s)", icon=":material/check_circle:")
 
     table = st.session_state.get("batch_table")
     if table is None or table.empty:
@@ -176,13 +176,14 @@ def render(config: dict):
 
     errored = table[table["Status"] == "Error"]
     if not errored.empty:
-        with st.expander(f"⚠️ {len(errored)} ticker(s) with errors"):
+        with st.expander(f"{len(errored)} ticker(s) with errors", icon=":material/warning:"):
             st.dataframe(errored[["Ticker", "Error"]], use_container_width=True, hide_index=True)
 
     st.download_button(
-        "⬇ Download batch results as CSV",
+        "Download batch results as CSV",
         display_table.to_csv(index=False).encode("utf-8"),
         file_name="batch_analysis_results.csv", mime="text/csv", key="download_batch_csv",
+        icon=":material/download:",
     )
 
     st.markdown("---")
@@ -196,7 +197,7 @@ def render(config: dict):
             loaded_config = dict(config)
             loaded_config["ticker"] = pick
             st.session_state["config"] = loaded_config
-            st.toast(f"Loaded {pick} into Charts/Metrics/Trade Log tabs", icon="📊")
+            st.toast(f"Loaded {pick} into Charts/Metrics/Trade Log tabs", icon=":material/bar_chart:")
             st.rerun()
     else:
         st.caption("No successfully analyzed tickers to drill into yet.")

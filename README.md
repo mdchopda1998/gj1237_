@@ -710,3 +710,76 @@ the three tabs can't drift out of sync since they all read from the same
 `get_active_filters()` function. Also re-ran the full regression suite
 (Run Analysis, Metrics filtered toggle, ratio preset switch, Reset all
 filters, Batch Analysis) - zero exceptions across all of it.
+
+## Light "Kite Web + Groww Web" theme (per Figma design brief)
+
+A full visual-language redesign was requested via a detailed Figma design
+brief (light fintech aesthetic inspired by Zerodha Kite Web + Groww Web).
+**No Figma file was produced** - there's no design-file tool available in
+this environment - but the brief's actual design system (color tokens,
+typography, component patterns, icon language) was translated directly
+into the working app's CSS/theme/charts, which is the more useful
+deliverable for an iterating Streamlit product than a static mockup would
+be. Zero changes to `smc_backend.py` or any analysis logic.
+
+### What changed
+
+- **Theme flipped from dark to light.** `.streamlit/config.toml` and
+  `ui/style.py`'s `PALETTE` now use the brief's exact color tokens:
+  `surface/page #F6F8FB`, `surface/card #FFFFFF`, `border/default #E4E8F0`,
+  `text/primary #0F1729`, `brand/primary #3861FB` (Kite-blue), `bull/green
+  #16A34A`, `bear/red #E5484D`, `warn/amber #F5A623`, `accent/teal
+  #00C896` - kept visually distinct from bull-green so it's never
+  mistaken for a profit signal, per the brief.
+- **Stat cards are now white with a colored left-border accent**, not a
+  colored card background - the single biggest visual shift the brief
+  called out explicitly. Caught a real bug fixing this: the old
+  `bull_soft`/`bear_soft` tokens were solid dark-theme badge colors;
+  reused directly as chart zone *fill* colors they'd have painted opaque
+  boxes over the candlesticks. Added separate `bull_overlay`/`bear_overlay`
+  tokens (true ~12% alpha, per the brief's spec) specifically for chart
+  fills, keeping the solid tokens for badges/cells as intended.
+- **All emoji replaced with Google's Material Symbols icon font** - the
+  brief's #1 "remove this" item ("emoji read as prototype, not product").
+  Two mechanisms, same icon family throughout: native Streamlit widgets
+  (tabs, buttons, expanders) use the `:material/name:` shortcode
+  Streamlit itself renders; custom HTML (section headers, the header
+  banner, the sidebar brand mark) uses a loaded
+  `<span class="material-symbols-outlined">` font via a new `icon_span()`
+  helper. Verified with a full-codebase Unicode sweep: zero emoji or
+  symbol characters remain outside `smc_backend.py`.
+- **Charts re-themed for light backgrounds**: thin light-grey gridlines
+  (`rgba(15,23,41,0.06)`) instead of the previous light-on-dark scheme,
+  candlesticks/volume bars recolored to the new bull/bear hex, equity
+  curve fill recolored to the new brand blue.
+- **Segmented control**: the sidebar's "Find stock by" picker now uses
+  `st.pills` (single-select) instead of a radio button, matching the
+  brief's Groww-style pill segmented control pattern.
+- **Tabs**: flat underline indicator in brand blue (Kite convention),
+  rather than a pill/card tab style.
+- **Tabular figures**: `font-variant-numeric: tabular-nums` applied
+  globally so numbers in tables and stat cards align on their digits.
+
+### What wasn't (and mostly can't be) done
+
+The brief also specifies things that are genuine Figma-file deliverables
+rather than app features, or that Streamlit's component model doesn't
+support without a custom frontend component (out of scope for a
+reskin): a literal Figma file with token/component/screen pages; tablet
+(1024px) and mobile (390px) specific frames with a collapsible drawer
+sidebar; frozen/sticky table columns; skeleton-shimmer loading transitions
+on filter changes (Streamlit reruns are already near-instant for these,
+so a spinner would be counterproductive); and a fully custom
+segmented-control/toggle component set beyond what `st.pills`/`st.toggle`
+already provide. If any of these matter enough to invest in, the
+concrete next step for the responsive/mobile piece would be checking
+Streamlit's mobile rendering behavior directly rather than assuming it
+needs a custom drawer.
+
+Verified with `streamlit.testing.v1.AppTest`: a 7-step interactive
+regression (Run Analysis, ratio preset switch, Metrics filtered toggle,
+Outcome filter narrowing, Trade Log chart-filter toggle, Reset all
+filters, Batch Analysis) - zero exceptions throughout - plus a direct
+inspection of every icon-bearing markdown block confirming single-line,
+non-indented, correctly-escaped HTML (the same class of bug fixed
+earlier in `stat_cards()`).

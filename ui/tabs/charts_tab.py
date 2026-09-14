@@ -2,7 +2,7 @@ import streamlit as st
 
 from charting import filter_zones, build_zone_figure, zones_display_table
 from filter_state import get_active_filters, trade_score_bool_columns, bool_filter_key, outcome_options
-from ui.style import section_header
+from ui.style import section_header, icon_span
 
 TF_LABELS = {"1d": "Daily", "1wk": "Weekly", "1mo": "Monthly"}
 SOURCE_NOTES = {
@@ -21,7 +21,7 @@ def render(config: dict, results):
         return
 
     section_header(
-        "📊", f"{config['ticker']} \u2014 Zones & Price Action",
+        "candlestick_chart", f"{config['ticker']} \u2014 Zones & Price Action",
         f"Analysis last computed: {results.analysis_timestamp}" if results.analysis_timestamp else "",
     )
 
@@ -33,13 +33,13 @@ def render(config: dict, results):
         # Older Streamlit (<1.28) doesn't support container(border=...)
         filter_box = st.container()
     with filter_box:
-        st.markdown("##### 🔍 Chart Filters — instant, does *not* re-run analysis")
+        st.markdown(f"##### {icon_span('filter_alt', size=16)} Chart Filters — instant, does *not* re-run analysis", unsafe_allow_html=True)
         st.caption(
             "These only change which zones are drawn below. Zone detection, the "
             "backtest, and scoring stay exactly as they were at the timestamp "
             "above until you click **Run Analysis** again in the sidebar. "
             "The Metrics tab has a matching toggle to see numbers for just "
-            "this filtered subset. Use **↺ Reset all filters** in the sidebar "
+            "this filtered subset. Use **Reset all filters** in the sidebar "
             "to clear everything below."
         )
 
@@ -175,8 +175,8 @@ def render(config: dict, results):
                     st.dataframe(table, use_container_width=True, hide_index=True,
                                  column_config=column_config)
                     st.download_button(
-                        f"⬇ Download {tf_label.lower()} zones as CSV",
+                        f"Download {tf_label.lower()} zones as CSV",
                         table.to_csv(index=False).encode("utf-8"),
                         file_name=f"{config['ticker']}_{tf_key}_zones.csv",
-                        mime="text/csv", key=f"download_zones_{tf_key}",
+                        mime="text/csv", key=f"download_zones_{tf_key}", icon=":material/download:",
                     )

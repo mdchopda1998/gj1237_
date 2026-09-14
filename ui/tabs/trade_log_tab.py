@@ -21,7 +21,7 @@ def render(config: dict, results):
         st.info("No trade log to show - see the error above.")
         return
 
-    section_header("🧾", "Trade Log")
+    section_header("receipt_long", "Trade Log")
 
     trade_log = results.trade_log
     if trade_log is None or trade_log.empty:
@@ -122,7 +122,7 @@ def render(config: dict, results):
     st.caption(f"{len(filtered)} of {len(trade_log_source)} trades shown.")
 
     st.download_button(
-        "⬇ Download trade log as CSV", filtered.to_csv(index=True).encode("utf-8"),
+        "Download trade log as CSV", filtered.to_csv(index=True).encode("utf-8"),
         file_name=f"{config.get('ticker', 'trades')}_trade_log.csv",
-        mime="text/csv", key="download_trade_log",
+        mime="text/csv", key="download_trade_log", icon=":material/download:",
     )
