@@ -209,8 +209,7 @@ def render_sidebar() -> dict:
             "real backend logic unchanged - this UI only adds filtering, charting, "
             "and presentation on top."
         )
-    print('I Mayur')
-
+        
     return {
         "ticker": ticker.strip().upper() if ticker else "",
         "start_date": start_date,
