@@ -1,9 +1,11 @@
+import html as _html
+
 import streamlit as st
 from datetime import date
 
 from ratio_config import default_ratio, resolve_gen_ratio, DAILY_PRESETS
 from index_constituents import search_universe
-from ui.style import icon_span
+from ui.style import icon_span, PALETTE
 
 
 def _apply_preset_to_session_state(preset_name: str):
@@ -81,7 +83,7 @@ def _render_ratio_controls(ratio: dict) -> dict:
                     tr_kwargs = {} if tr_key in st.session_state else \
                         {"value": float(tf_ratio[candle_type]["TR_ATR"])}
                     tr_atr = st.slider(
-                        f"TR/ATR ({candle_type[:3]}, {tf})", min_value=0.1, max_value=2.0, step=0.1,
+                        "TR/ATR", min_value=0.1, max_value=2.0, step=0.1,
                         key=tr_key, on_change=on_change, **tr_kwargs,
                     )
 
@@ -89,7 +91,7 @@ def _render_ratio_controls(ratio: dict) -> dict:
                     bs_kwargs = {} if bs_key in st.session_state else \
                         {"value": float(tf_ratio[candle_type]["BS_TR"])}
                     bs_tr = st.slider(
-                        f"Body/TR ({candle_type[:3]}, {tf})", min_value=0.1, max_value=1.0, step=0.05,
+                        "Body/TR", min_value=0.1, max_value=1.0, step=0.05,
                         key=bs_key, on_change=on_change, **bs_kwargs,
                     )
                     ratio["GEN.NS"].setdefault(tf, {})[candle_type] = {"TR_ATR": tr_atr, "BS_TR": bs_tr}
@@ -130,6 +132,15 @@ def _render_ticker_picker() -> str:
                  "a company name to filter. For anything outside that list (e.g. "
                  "SAIL.NS), switch to 'Type ticker directly'.",
         )
+        p = PALETTE
+        chip_html = (
+            '<div style="display:inline-flex;align-items:center;gap:0.4rem;'
+            f'background:{p["brand_soft"]};color:{p["brand"]};'
+            'border:1px solid rgba(56,97,251,0.3);border-radius:8px;'
+            'padding:0.35rem 0.7rem;font-size:0.85rem;font-weight:700;margin:0.3rem 0 0.5rem 0;">'
+            f'{_html.escape(selected)}</div>'
+        )
+        st.sidebar.markdown(chip_html, unsafe_allow_html=True)
         return selected
 
     return st.sidebar.text_input(
@@ -150,12 +161,12 @@ def render_sidebar() -> dict:
 
     ticker = _render_ticker_picker()
 
-    date_range = st.sidebar.date_input(
-        "Date Range",
-        value=(date(2021, 1, 1), date.today()),
-        help="Defaults to 2021-01-01 through today.",
-    )
-    start_date, end_date = (date_range if len(date_range) == 2 else (None, None))
+    st.sidebar.markdown(f"{icon_span('calendar_month', size=14)} **Date Range**", unsafe_allow_html=True)
+    d1, d2 = st.sidebar.columns(2)
+    with d1:
+        start_date = st.date_input("Start Date", value=date(2021, 1, 1), key="start_date_input")
+    with d2:
+        end_date = st.date_input("End Date", value=date.today(), key="end_date_input")
 
     risk_pct = st.sidebar.slider(
         "Risk per Trade (%)", min_value=0.1, max_value=5.0, value=1.0, step=0.1,

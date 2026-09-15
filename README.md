@@ -783,3 +783,107 @@ filters, Batch Analysis) - zero exceptions throughout - plus a direct
 inspection of every icon-bearing markdown block confirming single-line,
 non-indented, correctly-escaped HTML (the same class of bug fixed
 earlier in `stat_cards()`).
+
+## Mockup-driven polish pass (per updates.txt + screenshots)
+
+Every point below maps to a specific callout from the uploaded mockup
+screenshots. Zero changes to `smc_backend.py` or any analysis/backtest
+logic - everything here is either a new presentation-layer computation
+on data your backend already produces, or pure restyling.
+
+### Sidebar (charts_1.png)
+- **Date Range** split into two separate Start Date / End Date inputs
+  side by side, instead of one combined range picker.
+- **Ticker selection** now shows a colored chip confirming the selected
+  ticker (e.g. `RELIANCE.NS`) right under the company search box.
+- Ratio sliders (Advanced expander) relabeled without the redundant
+  `(candle, timeframe)` suffix - the surrounding section headers/captions
+  already establish that context, so the sliders themselves read cleaner.
+
+### Charts tab (charts_2.png)
+- **Chart heading card**: ticker + timeframe + a zone-count pill +
+  Demand/Supply color legend, above each candlestick chart (previously
+  this info was only in a caption below).
+- **Zone labels simplified** to `D3`/`S2` style (type letter + Base
+  Count, plus `· S{strength}` on the daily tab) instead of `BC3 S2`.
+- Volume subplot now has a `VOL` axis label.
+- Data-source caption rewords the live-fetch case as "Yahoo Finance
+  (yfinance)" to match the mockup's phrasing.
+- **Zone table redesigned**: added a combined `Price Range` column
+  (`₹X – ₹Y`, from Proximal/Distal) and a `Flags` column (comma-separated
+  list of whichever trade-score boolean columns are True for that zone) -
+  the individual Proximal/Distal/Target and per-flag boolean columns are
+  still present further along in the table, nothing is hidden, just
+  reordered so the curated/summary view comes first.
+
+### Backtest Metrics tab (backtest_matrics.png)
+- **Stat cards now show a "small key info" delta line**, all computed
+  from real numbers your backend already produces - nothing fabricated:
+  - Win Rate -> "`{wins}` wins / `{losses}` losses"
+  - Profit Factor -> "Above/Below breakeven (1.0)"
+  - System Expectancy -> "Avg PnL `{value}`"
+  - Net PNL -> "`{return%}` return" (computed from Final Capital vs.
+    Initial Capital - both real)
+  - Demand/Supply Zones -> "`{Profitable Demand/Supply Zones}` wins"
+    (this metric already existed in `evaluate_strategy_metrics`'s output,
+    just wasn't surfaced before)
+- **Indian-convention currency formatting** (`₹5.96L`, `₹96.3K`, `₹1.24Cr`)
+  via a new shared `format_inr()` helper, replacing raw full numbers.
+- **"Edge quality" badge** under the Composite Score gauge - a labeled
+  threshold on your real `calculate_composite_score` output (\u226570
+  "Strong Edge" / \u226540 "Moderate Edge" / below "Weak Edge"), not a new
+  calculation.
+
+### Trade Log tab (trade_log.png)
+- **New derived columns**, all pure arithmetic/joins on data your backend
+  already computed - no new analysis: `Days` (Exit - Entry date), `R
+  Multiple` (Trade_PnL / Risk_Amount_Per_Trade), `% Return` (Trade_PnL /
+  Capital_At_Entry), `Zone Score` (Strength, joined from trade_score by
+  the same index trade_log already uses).
+- **`Zone Proximal` / `Zone Distal` / `Zone Target`** columns, joined from
+  the daily zones dataframe by index. Deliberately labeled "Zone ..." and
+  not "Entry/Exit Price" - your backend doesn't log an actual fill price
+  anywhere, so showing the zone's real boundary levels under an honest
+  label is safer than implying a logged price that doesn't exist.
+- **Colored Outcome/PnL cells** via a pandas Styler (green/red, consistent
+  with the rest of the app) - confirmed `Styler` + `column_config` compose
+  correctly in this Streamlit version before relying on it.
+
+### Score Analysis tab (score_anal.png)
+- Numeric-factor charts (Strength, Base Count) now sit inside bordered
+  card containers with their own heading + one-line description.
+- **New "Flag Impact on Win Rate" list**: a clean custom HTML
+  label-bar-value-n° row per flag (replacing the Plotly tornado chart as
+  the primary view) - same `boolean_flag_summary()` data, just a more
+  minimal presentation matching the mockup. The Plotly tornado chart and
+  full comparison table are still available in a "Chart view + full
+  comparison table" expander for anyone who wants the interactive
+  version.
+
+### Batch Analysis tab (batch_anal.png)
+- **Ticker universe picker** switched from a radio row to a proper
+  segmented-pill control (`st.pills`).
+- **Company column** added (from `index_constituents.COMPANY_NAMES`,
+  blank for tickers outside the NIFTY 50/Next 50 universe).
+- **Composite Score now renders as an inline progress bar**
+  (`ProgressColumn`) - this is exactly the column type that crashed the
+  app on NaN values earlier in this project. Fixed safely this time: NaN
+  is filled to 0 only in a *display-only* copy of the table (the
+  underlying data used for CSV export and the errored-tickers list keeps
+  the real NaN, so nothing is misrepresented in exported data). Stress-
+  tested directly: ran the full NIFTY 50 batch (49 tickers, guaranteed
+  many NaN scores in this offline sandbox) - zero exceptions.
+- Colored Status (green/amber/red) and Net PNL (bull/bear) cells via the
+  same Styler pattern used in Trade Log.
+
+### Bug found during this pass
+A stopwatch emoji (`\u23f1\ufe0f`) in `batch_tab.py` had slipped past the
+previous emoji-removal sweep - it uses a Unicode block (Miscellaneous
+Technical) the earlier regex didn't cover. Widened the sweep's Unicode
+ranges and re-scanned the whole codebase; confirmed zero emoji/symbol
+characters remain outside `smc_backend.py`.
+
+Verified with a 7-step `AppTest` regression covering every tab and the
+riskiest change specifically (the batch table's `ProgressColumn`, tested
+against a full 49-ticker run with guaranteed NaN scores) - zero
+exceptions throughout.

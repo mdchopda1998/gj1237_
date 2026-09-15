@@ -1,13 +1,13 @@
 import streamlit as st
 
-from charting import filter_zones, build_zone_figure, zones_display_table
+from charting import filter_zones, build_zone_figure, zones_display_table, chart_heading
 from filter_state import get_active_filters, trade_score_bool_columns, bool_filter_key, outcome_options
 from ui.style import section_header, icon_span
 
 TF_LABELS = {"1d": "Daily", "1wk": "Weekly", "1mo": "Monthly"}
 SOURCE_NOTES = {
     "csv": "local saved CSV",
-    "live": "live yfinance fetch",
+    "live": "Yahoo Finance (yfinance)",
     "synthetic": "synthetic placeholder - no CSV found and live fetch failed",
 }
 
@@ -149,6 +149,7 @@ def render(config: dict, results):
             fig = build_zone_figure(zone_df, config["ticker"], tf_label,
                                      filtered_zones=filtered, trade_score=score_df,
                                      trim_at_breach=st.session_state.get("trim_at_breach", True))
+            chart_heading(config["ticker"], tf_label, len(filtered))
             st.plotly_chart(fig, use_container_width=True, key=f"zone_chart_{tf_key}")
 
             total_zones = int(zone_df["Zone_Created"].sum()) if "Zone_Created" in zone_df.columns else 0
@@ -156,7 +157,7 @@ def render(config: dict, results):
             source_note = SOURCE_NOTES.get(source, source)
             st.caption(
                 f"{len(filtered)} of {total_zones} zone(s) shown after filters "
-                f"\u00b7 data source: {source_note}"
+                f"\u00b7 Data source: {source_note}"
             )
 
             with st.expander(f"View {len(filtered)} filtered zone(s) as a table", expanded=False):
@@ -164,6 +165,17 @@ def render(config: dict, results):
                 if table.empty:
                     st.caption("No zones match the current filters.")
                 else:
+                    # Most useful columns first (matches a curated scanner-results
+                    # look) - nothing is hidden, any remaining detail columns
+                    # (individual boolean flags, raw Zone Created date, etc.)
+                    # still follow after, so the table stays scrollable-complete.
+                    preferred_order = ["Type", "Pattern", "Price Range", "Base Count", "Strength",
+                                        "Status", "Flags", "Zone Created", "Base Start Date",
+                                        "Breach Date", "Proximal", "Distal", "Target"]
+                    ordered_cols = [c for c in preferred_order if c in table.columns]
+                    ordered_cols += [c for c in table.columns if c not in ordered_cols]
+                    table = table[ordered_cols]
+
                     column_config = {
                         "Proximal": st.column_config.NumberColumn(format="₹%.2f"),
                         "Distal": st.column_config.NumberColumn(format="₹%.2f"),

@@ -6,7 +6,21 @@ import plotly.graph_objects as go
 from charting import filter_zones, filter_trade_log, _theme_layout, FONT_STACK
 from filter_state import get_active_filters, outcome_options
 from zone_identification_multibase import recompute_metrics_for_subset
-from ui.style import PALETTE, section_header, stat_cards
+from ui.style import PALETTE, section_header, stat_cards, format_inr, icon_span
+
+
+def _edge_badge(score) -> str:
+    """
+    A qualitative read on the Composite Score, shown as a small badge
+    under the gauge - purely a labeled threshold on a number your real
+    calculate_composite_score already produces, not a new calculation.
+    """
+    score = _safe_num(score, 0)
+    if score >= 70:
+        return '<span class="badge success">Strong Edge</span>'
+    if score >= 40:
+        return '<span class="badge warning">Moderate Edge</span>'
+    return '<span class="badge error">Weak Edge</span>'
 
 
 def _safe_num(x, default=0.0):
@@ -76,10 +90,14 @@ def _equity_curve(trade_log) -> go.Figure:
     return fig
 
 
-def _render_metric_cards(m: dict, trade_log=None):
+def _render_metric_cards(m: dict, trade_log=None, initial_capital=None):
     left, right = st.columns([1, 2])
     with left:
         st.plotly_chart(_composite_gauge(m.get("Composite Score")), use_container_width=True, key="composite_gauge_chart")
+        st.markdown(
+            f'<div style="text-align:center;margin-top:-0.5rem;">{_edge_badge(m.get("Composite Score"))}</div>',
+            unsafe_allow_html=True,
+        )
     with right:
         pf = m.get("Profit Factor")
         is_pf_nan = isinstance(pf, float) and math.isnan(pf)
@@ -87,6 +105,13 @@ def _render_metric_cards(m: dict, trade_log=None):
         win_rate = _safe_num(m.get("Win Rate"), 0)
         expectancy = _safe_num(m.get("System Expectancy"), 0)
         net_pnl = _safe_num(m.get("Net PNL"), 0)
+        total_trades = m.get("Total Trades", 0) or 0
+        winning_trades = m.get("Winning Trades", 0) or 0
+        losing_trades = max(total_trades - winning_trades, 0)
+        demand_zones = m.get("Demand Zones", 0) or 0
+        supply_zones = m.get("Supply Zones", 0) or 0
+        profitable_demand = m.get("Profitable Demand Zones", 0) or 0
+        profitable_supply = m.get("Profitable Supply Zones", 0) or 0
 
         # Final Capital = the last Capital_After_Trade in the trade log
         # (sorted by Exit Date) - your real run_risk_management_simulation
@@ -97,24 +122,34 @@ def _render_metric_cards(m: dict, trade_log=None):
             if not ordered_for_capital.empty:
                 final_capital = ordered_for_capital["Capital_After_Trade"].iloc[-1]
 
+        return_pct = None
+        if final_capital is not None and initial_capital:
+            return_pct = (final_capital - initial_capital) / initial_capital * 100
+
         stat_cards([
             {"label": "Win Rate", "value": f"{win_rate:.1f}%",
-             "color": "bull" if win_rate >= 50 else "bear"},
+             "color": "bull" if win_rate >= 50 else "bear",
+             "delta": f"{winning_trades} wins / {losing_trades} losses"},
             {"label": "Profit Factor", "value": pf_display,
-             "color": "bull" if _safe_num(pf, 0) >= 1 else "bear"},
-            {"label": "System Expectancy", "value": f"{expectancy:,.1f}",
-             "color": "bull" if expectancy >= 0 else "bear"},
+             "color": "bull" if _safe_num(pf, 0) >= 1 else "bear",
+             "delta": "Above breakeven (1.0)" if _safe_num(pf, 0) >= 1 else "Below breakeven (1.0)"},
+            {"label": "System Expectancy", "value": format_inr(expectancy),
+             "color": "bull" if expectancy >= 0 else "bear",
+             "delta": f"Avg PnL {format_inr(m.get('Avg PnL'))}" if m.get("Avg PnL") is not None else None},
         ])
         stat_cards([
-            {"label": "Final Capital", "value": f"₹{final_capital:,.0f}" if final_capital is not None else "N/A",
+            {"label": "Final Capital", "value": format_inr(final_capital) if final_capital is not None else "N/A",
              "color": "brand"},
-            {"label": "Net PNL", "value": f"₹{net_pnl:,.0f}",
-             "color": "bull" if net_pnl >= 0 else "bear"},
-            {"label": "Total Trades", "value": m.get("Total Trades", 0), "color": "accent"},
+            {"label": "Net PNL", "value": format_inr(net_pnl),
+             "color": "bull" if net_pnl >= 0 else "bear",
+             "delta": f"{return_pct:+.1f}% return" if return_pct is not None else None},
+            {"label": "Total Trades", "value": total_trades, "color": "accent"},
         ])
         stat_cards([
-            {"label": "Demand Zones", "value": m.get("Demand Zones", 0), "color": "bull"},
-            {"label": "Supply Zones", "value": m.get("Supply Zones", 0), "color": "bear"},
+            {"label": "Demand Zones", "value": f"{demand_zones} trades", "color": "bull",
+             "delta": f"{profitable_demand} wins"},
+            {"label": "Supply Zones", "value": f"{supply_zones} trades", "color": "bear",
+             "delta": f"{profitable_supply} wins"},
         ])
 
     if trade_log is not None and not trade_log.empty and "Exit Date" in trade_log.columns:
@@ -169,7 +204,7 @@ def render(config: dict, results):
     )
 
     if not use_filtered:
-        _render_metric_cards(m, trade_log=results.trade_log)
+        _render_metric_cards(m, trade_log=results.trade_log, initial_capital=config.get('initial_capital'))
         return
 
     # Mirror the exact same filter state the Charts tab set in session_state -
@@ -213,4 +248,4 @@ def render(config: dict, results):
         st.warning(f"Couldn't compute filtered metrics: {filtered_metrics['_error']}")
         return
 
-    _render_metric_cards(filtered_metrics, trade_log=filtered_trade_log)
+    _render_metric_cards(filtered_metrics, trade_log=filtered_trade_log, initial_capital=config.get('initial_capital'))

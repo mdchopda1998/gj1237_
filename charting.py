@@ -5,9 +5,12 @@ data_loading.py: nothing in here re-runs zone detection, backtesting, or
 scoring. Call this as many times as you like (e.g. every time a filter
 widget changes) without touching the cached analysis in data_access.py.
 """
+import html as _html
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import streamlit as st
 
 from ui.style import PALETTE
 
@@ -209,6 +212,7 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
                       for o, c in zip(zone_df["Open"], zone_df["Close"])]
         fig.add_trace(go.Bar(x=zone_df.index, y=zone_df["Volume"], marker_color=vol_colors,
                               name="Volume", showlegend=False), row=2, col=1)
+        fig.update_yaxes(title_text="VOL", row=2, col=1, title_font=dict(size=10, color=p["text_muted"]))
     else:
         fig.add_trace(candle)
 
@@ -216,16 +220,18 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
         is_demand = bool(zone["Is Demand"])
         x0, x1, is_breached, _ = _zone_bounds(zone_df, zdate, zone, trim_at_breach)
         color = p["bull_overlay"] if is_demand else p["bear_overlay"]
-        label_parts = []
-        if "Base Count" in zone.index and pd.notna(zone["Base Count"]):
-            label_parts.append(f"BC{int(zone['Base Count'])}")
+        # Short label: Type initial + Base Count (e.g. "D3", "S2"), matching
+        # a compact chart-tag convention - Strength is appended only when
+        # meaningfully available (daily timeframe).
+        type_letter = "D" if is_demand else "S"
+        base_count = int(zone["Base Count"]) if "Base Count" in zone.index and pd.notna(zone["Base Count"]) else None
+        label = f"{type_letter}{base_count}" if base_count is not None else type_letter
         if trade_score is not None and not trade_score.empty and zdate in trade_score.index:
             strength = trade_score.loc[zdate, "Strength"]
             if pd.notna(strength):
-                label_parts.append(f"S{int(strength)}")
+                label += f" \u00b7 S{int(strength)}"
         if is_breached:
-            label_parts.append("\u2715 breached")
-        label = " ".join(label_parts)
+            label += " \u2715"
 
         shape_kwargs = dict(row=1, col=1) if has_volume else {}
         fig.add_shape(
@@ -245,12 +251,38 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
 
     _theme_layout(
         fig,
-        title=dict(text=f"{ticker} \u00b7 {timeframe_label} zones ({len(zones)} shown)",
-                   font=dict(size=15, family=FONT_STACK, color=p["text"])),
         xaxis_rangeslider_visible=False, height=560 if has_volume else 520,
         showlegend=False,
     )
     return fig
+
+
+def chart_heading(ticker: str, timeframe_label: str, n_zones: int):
+    """
+    A card-style heading above the chart - ticker/timeframe + a zone-count
+    pill + a Demand/Supply color legend - separate from the Plotly figure
+    itself (the chart used to carry its own in-figure title; this reads
+    more like a product header, matching the rest of the app's card
+    language).
+    """
+    p = PALETTE
+    html_out = (
+        '<div style="display:flex;align-items:center;justify-content:space-between;'
+        f'background:{p["bg_card"]};border:1px solid {p["border"]};border-radius:12px 12px 0 0;'
+        'padding:0.7rem 1rem;border-bottom:none;">'
+        '<div style="display:flex;align-items:center;gap:0.6rem;">'
+        f'<span style="font-weight:700;color:{p["text"]};">{_html.escape(ticker)} \u00b7 {_html.escape(timeframe_label)}</span>'
+        f'<span class="badge muted">{n_zones} zone{"s" if n_zones != 1 else ""}</span>'
+        '</div>'
+        '<div style="display:flex;align-items:center;gap:1rem;font-size:0.8rem;color:'
+        f'{p["text_secondary"]};">'
+        f'<span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;'
+        f'background:{p["bull"]};margin-right:0.3rem;"></span>Demand</span>'
+        f'<span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;'
+        f'background:{p["bear"]};margin-right:0.3rem;"></span>Supply</span>'
+        '</div></div>'
+    )
+    st.markdown(html_out, unsafe_allow_html=True)
 
 
 def zones_display_table(filtered_zones: pd.DataFrame, trade_score: pd.DataFrame = None,
@@ -277,6 +309,15 @@ def zones_display_table(filtered_zones: pd.DataFrame, trade_score: pd.DataFrame 
         cols["Base Count"] = filtered_zones["Base Count"]
     if "Is Continuous" in filtered_zones.columns:
         cols["Pattern"] = filtered_zones["Is Continuous"].map({True: "Continuous", False: "Reversal"})
+
+    # "Price Range" - a single min-to-max string combining Proximal/Distal,
+    # easier to scan than three separate price columns. The individual
+    # Proximal/Distal/Target columns are still included below for anyone
+    # who wants the exact zone boundary values.
+    lo = filtered_zones[["Proximal", "Distal"]].min(axis=1)
+    hi = filtered_zones[["Proximal", "Distal"]].max(axis=1)
+    cols["Price Range"] = [f"\u20b9{a:,.2f} \u2013 \u20b9{b:,.2f}" for a, b in zip(lo.values, hi.values)]
+
     cols["Proximal"] = filtered_zones["Proximal"]
     cols["Distal"] = filtered_zones["Distal"]
     cols["Target"] = filtered_zones["Target"]
@@ -295,6 +336,21 @@ def zones_display_table(filtered_zones: pd.DataFrame, trade_score: pd.DataFrame 
         table["Breach Date"] = breach_dates
 
     if trade_score is not None and not trade_score.empty:
+        # "Flags" - every True boolean trade-score column for this zone,
+        # summarized as one comma-separated string (Strength/Freshness and
+        # the individual boolean columns are still added below too, for
+        # anyone who wants to filter/sort on a specific one).
+        from filter_state import trade_score_bool_columns
+        flag_cols = trade_score_bool_columns(trade_score)
+        flags_list = []
+        for zdate in filtered_zones.index:
+            if zdate in trade_score.index:
+                active = [c for c in flag_cols if bool(trade_score.loc[zdate, c])]
+                flags_list.append(", ".join(active) if active else "\u2014")
+            else:
+                flags_list.append("\u2014")
+        table["Flags"] = flags_list
+
         skip = {"Ticker", "Is Demand", "Is Continuous", "Base Count"}  # already have these above
         for col in trade_score.columns:
             if col in skip:

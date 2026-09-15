@@ -24,6 +24,7 @@ badges):
                      mistaken for a profit/positive signal
 """
 import html as _html
+import math
 import streamlit as st
 
 PALETTE = {
@@ -265,6 +266,28 @@ def section_header(icon: str, title: str, subtitle: str = ""):
     )
     if subtitle:
         st.markdown(f'<div class="section-sub">{_html.escape(subtitle)}</div>', unsafe_allow_html=True)
+
+
+def format_inr(value, decimals: int = 2) -> str:
+    """
+    Indian-convention compact currency string: Crore/Lakh/Thousand
+    abbreviations (₹5.96L, ₹96.3K, ₹1.24Cr) instead of a raw full number -
+    matches how Kite/Groww display large rupee figures. Pure formatting of
+    a number you already have; no calculation performed here.
+    """
+    if value is None:
+        return "N/A"
+    if isinstance(value, float) and math.isnan(value):
+        return "N/A"
+    sign = "-" if value < 0 else ""
+    v = abs(value)
+    if v >= 1_00_00_000:
+        return f"{sign}\u20b9{v / 1_00_00_000:.{decimals}f}Cr"
+    if v >= 1_00_000:
+        return f"{sign}\u20b9{v / 1_00_000:.{decimals}f}L"
+    if v >= 1_000:
+        return f"{sign}\u20b9{v / 1_000:.1f}K"
+    return f"{sign}\u20b9{v:,.0f}"
 
 
 def stat_cards(cards: list):

@@ -1,8 +1,9 @@
 import streamlit as st
+import numpy as np
 
 from charting import filter_zones, filter_trade_log
 from filter_state import get_active_filters, outcome_options as shared_outcome_options
-from ui.style import section_header, stat_cards
+from ui.style import section_header, stat_cards, format_inr, PALETTE
 
 
 def _safe_options(series):
@@ -11,6 +12,73 @@ def _safe_options(series):
     column has mixed real values and NaN (seen in real Zone_Type data)."""
     filled = series.fillna("Unknown").astype(str)
     return sorted(filled.unique()), filled
+
+
+def _enrich_trade_log(trade_log, zones_1d, trade_score):
+    """
+    Adds purely-derived display columns to a copy of trade_log - pure
+    arithmetic/joins on data your backend already produced, no new
+    analysis:
+        Days        = (Exit Date - Entry Date).days
+        % Return    = Trade_PnL / Capital_At_Entry * 100
+        R Multiple  = Trade_PnL / Risk_Amount_Per_Trade
+        Zone Score  = Strength, joined from trade_score by index (zone
+                      creation date, which trade_log's index already is)
+        Zone Proximal/Distal/Target = joined from the daily zones
+                      dataframe by the same index - these are the zone's
+                      actual price levels your identity_zones_with_multibase
+                      computed, NOT a literally-logged entry/exit fill
+                      price (your backend doesn't log those anywhere),
+                      so they're labeled "Zone ..." rather than
+                      "Entry/Exit Price" to avoid implying otherwise.
+    """
+    df = trade_log.copy()
+    if "Entry Date" in df.columns and "Exit Date" in df.columns:
+        df["Days"] = (df["Exit Date"] - df["Entry Date"]).dt.days
+    if "Trade_PnL" in df.columns and "Capital_At_Entry" in df.columns:
+        df["% Return"] = df["Trade_PnL"] / df["Capital_At_Entry"].replace(0, np.nan) * 100
+    if "Trade_PnL" in df.columns and "Risk_Amount_Per_Trade" in df.columns:
+        df["R Multiple"] = df["Trade_PnL"] / df["Risk_Amount_Per_Trade"].replace(0, np.nan)
+    if trade_score is not None and not trade_score.empty and "Strength" in trade_score.columns:
+        df["Zone Score"] = df.index.map(trade_score["Strength"])
+    if zones_1d is not None and not zones_1d.empty:
+        for col, label in [("Proximal", "Zone Proximal"), ("Distal", "Zone Distal"), ("Target", "Zone Target")]:
+            if col in zones_1d.columns:
+                df[label] = df.index.map(zones_1d[col])
+    return df
+
+
+def _style_trade_log(df):
+    """Colors Outcome (green/red) and every signed numeric outcome column
+    (Trade_PnL, % Return, R Multiple) consistently with the app's
+    bull/bear color language - purely visual, no data changes."""
+    p = PALETTE
+
+    def color_outcome(val):
+        if val == "Profit":
+            return f"color:{p['bull']};font-weight:600"
+        if isinstance(val, str) and "loss" in val.lower():
+            return f"color:{p['bear']};font-weight:600"
+        return ""
+
+    def color_signed(val):
+        try:
+            v = float(val)
+        except (TypeError, ValueError):
+            return ""
+        if v > 0:
+            return f"color:{p['bull']}"
+        if v < 0:
+            return f"color:{p['bear']}"
+        return ""
+
+    styler = df.style
+    if "Outcome" in df.columns:
+        styler = styler.map(color_outcome, subset=["Outcome"])
+    for col in ["Trade_PnL", "% Return", "R Multiple"]:
+        if col in df.columns:
+            styler = styler.map(color_signed, subset=[col])
+    return styler
 
 
 def render(config: dict, results):
@@ -100,15 +168,33 @@ def render(config: dict, results):
         win_rate = 100 * (filtered["Outcome"] == "Profit").sum() / len(filtered)
         stat_cards([
             {"label": "Trades Shown", "value": len(filtered), "color": "brand"},
-            {"label": "Net PNL (shown)", "value": f"₹{net_pnl:,.0f}", "color": "bull" if net_pnl >= 0 else "bear"},
+            {"label": "Net PNL (shown)", "value": format_inr(net_pnl), "color": "bull" if net_pnl >= 0 else "bear"},
             {"label": "Win Rate (shown)", "value": f"{win_rate:.1f}%", "color": "bull" if win_rate >= 50 else "bear"},
         ])
+
+    enriched = _enrich_trade_log(filtered, results.zones.get("1d"), results.trade_score)
+
+    # Most useful columns first - date, direction, the derived read-at-a-glance
+    # metrics (Days/R-Multiple/%Return/Zone Score), then the full raw detail
+    # your backend actually produced, so nothing is hidden.
+    preferred_order = ["Date Created", "Entry Date", "Exit Date", "Zone_Type", "Outcome",
+                        "Days", "R Multiple", "% Return", "Zone Score", "Trade_PnL",
+                        "Zone Proximal", "Zone Distal", "Zone Target"]
+    ordered_cols = [c for c in preferred_order if c in enriched.columns]
+    ordered_cols += [c for c in enriched.columns if c not in ordered_cols]
+    enriched = enriched[ordered_cols]
 
     column_config = {
         "Trade_PnL": st.column_config.NumberColumn("Trade P&L", format="₹%.2f"),
         "Capital_At_Entry": st.column_config.NumberColumn(format="₹%.2f"),
         "Capital_After_Trade": st.column_config.NumberColumn(format="₹%.2f"),
         "Risk_Amount_Per_Trade": st.column_config.NumberColumn(format="₹%.2f"),
+        "Zone Proximal": st.column_config.NumberColumn(format="₹%.2f"),
+        "Zone Distal": st.column_config.NumberColumn(format="₹%.2f"),
+        "Zone Target": st.column_config.NumberColumn(format="₹%.2f"),
+        "% Return": st.column_config.NumberColumn(format="%.2f%%"),
+        "R Multiple": st.column_config.NumberColumn(format="%.2fR"),
+        "Days": st.column_config.NumberColumn(format="%d"),
         "Piercing_Depth": st.column_config.NumberColumn(
             format="%.2f",
             help="Fraction of the zone pierced before exit. Blank = trade never entered "
@@ -118,11 +204,12 @@ def render(config: dict, results):
         "Exit Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
         "Date Created": st.column_config.DateColumn(format="YYYY-MM-DD"),
     }
-    st.dataframe(filtered, use_container_width=True, hide_index=True, column_config=column_config)
+    st.dataframe(_style_trade_log(enriched), use_container_width=True, hide_index=True,
+                 column_config=column_config)
     st.caption(f"{len(filtered)} of {len(trade_log_source)} trades shown.")
 
     st.download_button(
-        "Download trade log as CSV", filtered.to_csv(index=True).encode("utf-8"),
+        "Download trade log as CSV", enriched.to_csv(index=True).encode("utf-8"),
         file_name=f"{config.get('ticker', 'trades')}_trade_log.csv",
         mime="text/csv", key="download_trade_log", icon=":material/download:",
     )

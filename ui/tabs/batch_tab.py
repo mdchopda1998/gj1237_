@@ -10,8 +10,13 @@ import streamlit as st
 import pandas as pd
 
 from data_access import get_strategy_results
-from index_constituents import PRESETS, get_ticker_list, get_as_of
-from ui.style import section_header, stat_cards
+from index_constituents import PRESETS, get_ticker_list, get_as_of, COMPANY_NAMES
+from ui.style import section_header, stat_cards, format_inr, icon_span, PALETTE
+
+
+def _company_name_for(ticker: str) -> str:
+    symbol = ticker[:-3] if ticker.endswith(".NS") else ticker
+    return COMPANY_NAMES.get(symbol, "")
 
 
 def _tickers_from_source(source: str, custom_text: str, uploaded_file) -> list:
@@ -42,11 +47,19 @@ def render(config: dict):
         "is unchanged, this just loops the same call.",
     )
 
-    source = st.radio(
-        "Ticker source",
-        ["NIFTY 50", "NIFTY Next 50", "NIFTY 100", "Custom list", "Upload CSV"],
-        horizontal=True, key="batch_source",
-    )
+    if hasattr(st, "pills"):
+        source = st.pills(
+            "Ticker source",
+            ["NIFTY 50", "NIFTY Next 50", "NIFTY 100", "Custom list", "Upload CSV"],
+            default="NIFTY 50", key="batch_source",
+        )
+        source = source or "NIFTY 50"
+    else:
+        source = st.radio(
+            "Ticker source",
+            ["NIFTY 50", "NIFTY Next 50", "NIFTY 100", "Custom list", "Upload CSV"],
+            horizontal=True, key="batch_source",
+        )
 
     custom_text, uploaded_file = "", None
     if source == "Custom list":
@@ -78,7 +91,7 @@ def render(config: dict):
 
     if len(tickers) > 25:
         st.caption(
-            f"⏱️ {len(tickers)} tickers is a lot for a single run - each one repeats the full "
+            f"{len(tickers)} tickers is a lot for a single run - each one repeats the full "
             "zone detection/backtest/scoring pipeline. Local CSVs in your data folder are much "
             "faster than live yfinance fetches; large batches with live fetches can take several minutes."
         )
@@ -113,7 +126,8 @@ def render(config: dict):
             m = (res.metrics if res is not None else {}) or {}
             status = "Error" if err else ("No Trades" if not m else "OK")
             rows.append({
-                "Ticker": ticker, "Status": status, "Error": err,
+                "Ticker": ticker, "Company": _company_name_for(ticker),
+                "Status": status, "Error": err,
                 "Composite Score": m.get("Composite Score"),
                 "Win Rate": m.get("Win Rate"),
                 "Profit Factor": m.get("Profit Factor"),
@@ -164,13 +178,51 @@ def render(config: dict):
         display_table = display_table[display_table["Composite Score"].fillna(-1) >= min_score]
     display_table = display_table.sort_values(sort_by, ascending=(sort_by == "Ticker"), na_position="last")
 
+    # ProgressColumn requires every cell to be a bounded non-NaN number -
+    # fill NaN Composite Score with 0 in this DISPLAY-ONLY copy so the
+    # inline bar renders without crashing (the underlying `table` used for
+    # CSV export and the errored-tickers list keeps the real NaN values,
+    # so nothing is silently misrepresented in the exported data).
+    display_for_table = display_table.drop(columns=["Error"]).copy()
+    display_for_table["Composite Score"] = display_for_table["Composite Score"].fillna(0)
+
+    def _style_batch(val_col):
+        p = PALETTE
+
+        def color_status(val):
+            if val == "OK":
+                return f"color:{p['bull']};font-weight:600"
+            if val == "Error":
+                return f"color:{p['bear']};font-weight:600"
+            if val == "No Trades":
+                return f"color:{p['warn']};font-weight:600"
+            return ""
+
+        def color_pnl(val):
+            try:
+                v = float(val)
+            except (TypeError, ValueError):
+                return ""
+            if v > 0:
+                return f"color:{p['bull']}"
+            if v < 0:
+                return f"color:{p['bear']}"
+            return ""
+
+        styler = val_col.style
+        if "Status" in val_col.columns:
+            styler = styler.map(color_status, subset=["Status"])
+        if "Net PNL" in val_col.columns:
+            styler = styler.map(color_pnl, subset=["Net PNL"])
+        return styler
+
     column_config = {
         "Win Rate": st.column_config.NumberColumn(format="%.1f%%"),
         "Net PNL": st.column_config.NumberColumn(format="₹%.2f"),
-        "Composite Score": st.column_config.NumberColumn(format="%.1f"),
+        "Composite Score": st.column_config.ProgressColumn(format="%.1f", min_value=0, max_value=100),
         "Profit Factor": st.column_config.NumberColumn(format="%.2f"),
     }
-    st.dataframe(display_table.drop(columns=["Error"]), use_container_width=True, hide_index=True,
+    st.dataframe(_style_batch(display_for_table), use_container_width=True, hide_index=True,
                  column_config=column_config)
     st.caption(f"{len(display_table)} of {len(table)} tickers shown.")
 

@@ -1,10 +1,12 @@
+import html as _html
+
 import streamlit as st
 import plotly.graph_objects as go
 
 from score_analysis import merge_trade_log_with_score, numeric_breakdown, boolean_flag_summary
 from filter_state import trade_score_bool_columns
 from charting import _theme_layout, FONT_STACK
-from ui.style import PALETTE, section_header
+from ui.style import PALETTE, section_header, format_inr
 
 
 def _breakdown_chart(breakdown, column_label: str) -> go.Figure:
@@ -22,13 +24,54 @@ def _breakdown_chart(breakdown, column_label: str) -> go.Figure:
     ))
     _theme_layout(
         fig,
-        title=dict(text=f"Win Rate & Avg PnL by {column_label}", font=dict(size=14, family=FONT_STACK, color=p["text"])),
         xaxis_title=column_label,
         yaxis=dict(title="Win Rate (%)", side="left"),
         yaxis2=dict(title="Avg PnL (₹)", overlaying="y", side="right", gridcolor="rgba(0,0,0,0)"),
-        height=380, legend=dict(orientation="h", y=1.15),
+        height=340, legend=dict(orientation="h", y=1.15),
     )
     return fig
+
+
+def _flag_impact_list(summary, baseline_win_rate: float) -> str:
+    """
+    A clean, minimal alternative to a full Plotly chart for the boolean
+    flags: label - colored horizontal bar - delta value - sample size,
+    one row per flag, sorted by |delta| descending. Pure HTML/CSS built
+    from the same boolean_flag_summary() data the Plotly tornado chart
+    (still available further down) uses - no separate calculation.
+    """
+    p = PALETTE
+    ordered = summary.dropna(subset=["Win Rate Delta"]).copy()
+    ordered["abs_delta"] = ordered["Win Rate Delta"].abs()
+    ordered = ordered.sort_values("abs_delta", ascending=False)
+    max_abs = max(ordered["abs_delta"].max(), 1.0)
+
+    rows = []
+    for _, row in ordered.iterrows():
+        delta = row["Win Rate Delta"]
+        color = p["bull"] if delta >= 0 else p["bear"]
+        width_pct = min(100, (abs(delta) / max_abs) * 100)
+        n_total = int(row["N (True)"]) + int(row["N (False)"])
+        rows.append(
+            '<div style="display:flex;align-items:center;gap:0.75rem;padding:0.45rem 0;'
+            f'border-bottom:1px solid {p["border"]};">'
+            f'<div style="width:140px;font-size:0.85rem;font-weight:600;color:{p["text"]};'
+            f'flex-shrink:0;">{_html.escape(str(row["Flag"]))}</div>'
+            '<div style="flex:1;background:'
+            f'{p["bg"]};border-radius:6px;height:18px;position:relative;">'
+            f'<div style="width:{width_pct:.0f}%;background:{color};height:100%;border-radius:6px;"></div>'
+            '</div>'
+            f'<div style="width:70px;text-align:right;font-weight:700;font-size:0.85rem;color:{color};">'
+            f'{delta:+.1f}pts</div>'
+            f'<div style="width:55px;text-align:right;font-size:0.78rem;color:{p["text_muted"]};">n={n_total}</div>'
+            '</div>'
+        )
+    return (
+        f'<div style="margin-top:0.5rem;">'
+        f'<div style="font-size:0.78rem;color:{p["text_muted"]};margin-bottom:0.4rem;">'
+        f'Baseline win rate: {baseline_win_rate:.1f}% \u00b7 delta shown is vs. this baseline</div>'
+        + "".join(rows) + "</div>"
+    )
 
 
 def _tornado_chart(summary) -> go.Figure:
@@ -82,17 +125,23 @@ def render(config: dict, results):
     st.markdown("##### Numeric factors")
     n1, n2 = st.columns(2)
     with n1:
-        strength_breakdown = numeric_breakdown(merged, "Strength")
-        if not strength_breakdown.empty:
-            st.plotly_chart(_breakdown_chart(strength_breakdown, "Strength"), use_container_width=True, key="strength_breakdown_chart")
-        else:
-            st.caption("No Strength data to show.")
+        with st.container(border=True):
+            st.markdown("**Zone Strength**")
+            st.caption("Win rate (bars) and avg P&L (line) by strength bucket")
+            strength_breakdown = numeric_breakdown(merged, "Strength")
+            if not strength_breakdown.empty:
+                st.plotly_chart(_breakdown_chart(strength_breakdown, "Strength"), use_container_width=True, key="strength_breakdown_chart")
+            else:
+                st.caption("No Strength data to show.")
     with n2:
-        basecount_breakdown = numeric_breakdown(merged, "Base Count")
-        if not basecount_breakdown.empty:
-            st.plotly_chart(_breakdown_chart(basecount_breakdown, "Base Count"), use_container_width=True, key="basecount_breakdown_chart")
-        else:
-            st.caption("No Base Count data to show.")
+        with st.container(border=True):
+            st.markdown("**Base Count**")
+            st.caption("Win rate and avg P&L by number of base candles in zone")
+            basecount_breakdown = numeric_breakdown(merged, "Base Count")
+            if not basecount_breakdown.empty:
+                st.plotly_chart(_breakdown_chart(basecount_breakdown, "Base Count"), use_container_width=True, key="basecount_breakdown_chart")
+            else:
+                st.caption("No Base Count data to show.")
 
     st.markdown("##### Boolean score flags")
     st.caption(
@@ -106,9 +155,14 @@ def render(config: dict, results):
     if summary.empty:
         st.caption("Not enough data to compare flags.")
     else:
-        st.plotly_chart(_tornado_chart(summary), use_container_width=True, key="tornado_chart")
+        baseline_win_rate = 100 * (merged["Outcome"] == "Profit").sum() / len(merged)
+        with st.container(border=True):
+            st.markdown("**Flag Impact on Win Rate**")
+            st.markdown(_flag_impact_list(summary, baseline_win_rate), unsafe_allow_html=True)
 
-        with st.expander("Full comparison table", expanded=False):
+        with st.expander("Chart view + full comparison table", expanded=False):
+            st.plotly_chart(_tornado_chart(summary), use_container_width=True, key="tornado_chart")
+
             column_config = {
                 "Win Rate (True)": st.column_config.NumberColumn(format="%.1f%%"),
                 "Win Rate (False)": st.column_config.NumberColumn(format="%.1f%%"),
