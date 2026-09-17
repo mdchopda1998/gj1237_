@@ -64,7 +64,7 @@ def _render_ratio_controls(ratio: dict) -> dict:
 
     with st.sidebar.expander("Advanced: edit TR/ATR & Body/TR thresholds", expanded=False):
         st.caption(
-            f"Showing **{preset_name}** values below."
+            f"Showing **{preset_name}** Mayur values below."
             if preset_name != "Custom" else
             "Showing **Custom** values below (edited from whichever preset was last selected)."
         )
