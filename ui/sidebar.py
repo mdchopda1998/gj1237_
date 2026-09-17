@@ -69,35 +69,63 @@ def _render_ratio_controls(ratio: dict) -> dict:
             "Showing **Custom** values below (edited from whichever preset was last selected)."
         )
         for tf, tf_label in [("1d", "Daily"), ("1wk", "Weekly"), ("1mo", "Monthly")]:
-            st.markdown(f"**{tf_label.upper()}**")
+            st.markdown(f"**{tf_label}**")
             tf_ratio = resolve_gen_ratio(tf, ratio)
-            # Presets only cover the daily timeframe, so only Daily sliders
-            # need to flip the dropdown back to Custom.
-            on_change = _mark_custom if tf == "1d" else None
+            cols = st.columns(3)
+            for col, candle_type in zip(cols, ["Exciting", "Base", "Explosive"]):
+                with col:
+                    st.caption(candle_type)
+                    # Presets only cover the daily timeframe, so only Daily
+                    # sliders need to flip the dropdown back to Custom.
+                    on_change = _mark_custom if tf == "1d" else None
 
-            # Single-column, full-width sliders (one per row) instead of a
-            # 3-column grid - much more readable in a narrow sidebar, and
-            # matches the requested layout. Still all 6 sliders per
-            # timeframe (Exciting/Base/Explosive x TR/ATR & Body/TR) -
-            # nothing removed, just restacked vertically.
-            for candle_type in ["Exciting", "Base", "Explosive"]:
-                tr_key = f"tr_atr_{tf}_{candle_type}"
-                tr_kwargs = {} if tr_key in st.session_state else \
-                    {"value": float(tf_ratio[candle_type]["TR_ATR"])}
-                tr_atr = st.slider(
-                    f"{candle_type} \u00b7 TR/ATR", min_value=0.1, max_value=2.0, step=0.1,
-                    key=tr_key, on_change=on_change, **tr_kwargs,
-                )
+                    tr_key = f"tr_atr_{tf}_{candle_type}"
+                    tr_kwargs = {} if tr_key in st.session_state else \
+                        {"value": float(tf_ratio[candle_type]["TR_ATR"])}
+                    tr_atr = st.slider(
+                        "TR/ATR", min_value=0.1, max_value=2.0, step=0.1,
+                        key=tr_key, on_change=on_change, **tr_kwargs,
+                    )
 
-                bs_key = f"bs_tr_{tf}_{candle_type}"
-                bs_kwargs = {} if bs_key in st.session_state else \
-                    {"value": float(tf_ratio[candle_type]["BS_TR"])}
-                bs_tr = st.slider(
-                    f"{candle_type} \u00b7 Body/TR", min_value=0.1, max_value=1.0, step=0.05,
-                    key=bs_key, on_change=on_change, **bs_kwargs,
-                )
-                ratio["GEN.NS"].setdefault(tf, {})[candle_type] = {"TR_ATR": tr_atr, "BS_TR": bs_tr}
-    return ratio
+                    bs_key = f"bs_tr_{tf}_{candle_type}"
+                    bs_kwargs = {} if bs_key in st.session_state else \
+                        {"value": float(tf_ratio[candle_type]["BS_TR"])}
+                    bs_tr = st.slider(
+                        "Body/TR", min_value=0.1, max_value=1.0, step=0.05,
+                        key=bs_key, on_change=on_change, **bs_kwargs,
+                    )
+                    ratio["GEN.NS"].setdefault(tf, {})[candle_type] = {"TR_ATR": tr_atr, "BS_TR": bs_tr}
+    return ratio        
+    #     for tf, tf_label in [("1d", "Daily"), ("1wk", "Weekly"), ("1mo", "Monthly")]:
+    #         st.markdown(f"**{tf_label.upper()}**")
+    #         tf_ratio = resolve_gen_ratio(tf, ratio)
+    #         # Presets only cover the daily timeframe, so only Daily sliders
+    #         # need to flip the dropdown back to Custom.
+    #         on_change = _mark_custom if tf == "1d" else None
+
+    #         # Single-column, full-width sliders (one per row) instead of a
+    #         # 3-column grid - much more readable in a narrow sidebar, and
+    #         # matches the requested layout. Still all 6 sliders per
+    #         # timeframe (Exciting/Base/Explosive x TR/ATR & Body/TR) -
+    #         # nothing removed, just restacked vertically.
+    #         for candle_type in ["Exciting", "Base", "Explosive"]:
+    #             tr_key = f"tr_atr_{tf}_{candle_type}"
+    #             tr_kwargs = {} if tr_key in st.session_state else \
+    #                 {"value": float(tf_ratio[candle_type]["TR_ATR"])}
+    #             tr_atr = st.slider(
+    #                 f"{candle_type} \u00b7 TR/ATR", min_value=0.1, max_value=2.0, step=0.1,
+    #                 key=tr_key, on_change=on_change, **tr_kwargs,
+    #             )
+
+    #             bs_key = f"bs_tr_{tf}_{candle_type}"
+    #             bs_kwargs = {} if bs_key in st.session_state else \
+    #                 {"value": float(tf_ratio[candle_type]["BS_TR"])}
+    #             bs_tr = st.slider(
+    #                 f"{candle_type} \u00b7 Body/TR", min_value=0.1, max_value=1.0, step=0.05,
+    #                 key=bs_key, on_change=on_change, **bs_kwargs,
+    #             )
+    #             ratio["GEN.NS"].setdefault(tf, {})[candle_type] = {"TR_ATR": tr_atr, "BS_TR": bs_tr}
+    # return ratio
 
 
 def _render_ticker_picker() -> str:
