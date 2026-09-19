@@ -1005,7 +1005,7 @@ def run_risk_management_simulation(df_bt, initial_capital, risk_percentage_per_t
         trade_exit_date = row['Exit Date']
 
         # Check if a trade is currently active and if the current trade's entry date is before or on the active trade's exit date
-        if 1:
+        if 0:
           if active_trade_exit_date is not None and trade_entry_date <= active_trade_exit_date:
               # Skip this trade as another is active or just exited on the same day
               df_rm.loc[index, 'Capital_At_Entry'] = current_capital
