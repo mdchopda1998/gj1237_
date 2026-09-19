@@ -83,6 +83,7 @@ def _zone_bounds(zone_df: pd.DataFrame, zdate, zone: pd.Series, trim_at_breach: 
 
         if not pd.isna(zone_df["Exit Date"]):
             x1 = zone_df["Exit Date"]
+            breach_date = zone_df["Exit Date"]
             is_breached = True
 
 
