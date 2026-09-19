@@ -122,12 +122,13 @@ def _render_ticker_picker() -> str:
         universe = search_universe()  # [(ticker, "Company Name (TICKER.NS)"), ...]
         tickers = [t for t, _label in universe]
         label_map = dict(universe)
-        default_ticker = "RELIANCE.NS" if "RELIANCE.NS" in tickers else tickers[0]
+        # default_ticker = "RELIANCE.NS" if "RELIANCE.NS" in tickers else tickers[0]
+        default_ticker = "SAIL.NS" if "SAIL.NS" in tickers else tickers[0]
         default_index = tickers.index(default_ticker)
         selected = st.sidebar.selectbox(
             "Company", options=tickers, index=default_index,
             format_func=lambda t: label_map.get(t, t),
-            help="Covers NIFTY 50 + NIFTY Next 50 (~99 companies) - start typing "
+            help="NIFTY 500 (N50 + NNext50 + Nmidcap150 + Nsmallcap250) - start typing"
                  "a company name to filter. For anything outside that list (e.g. "
                  "SAIL.NS), switch to 'Type ticker directly'.",
         )

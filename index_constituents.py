@@ -370,8 +370,7 @@ COMPANY_NAMES = {
     "WOCKPHARMA": "Wockhardt Limited",
     "YESBANK": "Yes Bank",
     "ZEEL": "Zee Entertainment Enterprises",
-    "ZENSARTECH": "Zensar Technologies"
-
+    "ZENSARTECH": "Zensar Technologies",
 
     ## Nifty Small Cap 250
     "AARTIIND": "Aarti Industries",
