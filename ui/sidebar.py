@@ -114,7 +114,7 @@ def _render_ticker_picker() -> str:
         mode = mode or "Search Stock"
     else:
         mode = st.sidebar.radio(
-            "Find stock by", ["Search company name", "Type ticker directly"],
+            "Find stock by", ["Search Stock", "Type ticker directly"],
             horizontal=True, key="ticker_input_mode",
         )
 
