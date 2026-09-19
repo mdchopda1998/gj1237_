@@ -195,6 +195,7 @@ def render_sidebar() -> dict:
     ratio = _render_ratio_controls(default_ratio())
 
     st.sidebar.divider()
+
     if st.sidebar.button("Reset all filters", icon=":material/restart_alt:", use_container_width=True,
                           help="Clears chart/table filter selections (Base Count, Zone Type, Strength, etc). "
                                "Does not re-run analysis or change these sidebar settings."):
@@ -207,10 +208,7 @@ def render_sidebar() -> dict:
 
     with st.sidebar.expander("About this app", icon=":material/info:", expanded=False):
         st.caption(
-            "SMC (Smart Money Concepts) demand/supply zone scanner and backtester "
-            "for NSE equities. Zone detection, backtesting, and scoring run your "
-            "real backend logic unchanged - this UI only adds filtering, charting, "
-            "and presentation on top."
+            "A journey from Cosmo to Liberation."
         )
         
     return {

@@ -30,13 +30,13 @@ def _run_analysis_with_status(config: dict):
     this only adds visibility into stages that already existed.
     """
     with st.status("Running analysis...", expanded=True) as status:
-        st.write(f"Loading {config['ticker']} OHLC (CSV-first, live fallback)...")
-        load_multi_interval(config["ticker"], config["start_date"], config["end_date"],
-                             data_dir=config["data_dir"], intervals=tuple(TIMEFRAMES.keys()))
+        # st.write(f"Loading {config['ticker']} OHLC (CSV-first, live fallback)...")
+        # load_multi_interval(config["ticker"], config["start_date"], config["end_date"],
+        #                      data_dir=config["data_dir"], intervals=tuple(TIMEFRAMES.keys()))
 
-        st.write(f"Loading {NIFTY_TICKER} benchmark OHLC...")
-        load_multi_interval(NIFTY_TICKER, config["start_date"], config["end_date"],
-                             data_dir=config["data_dir"], intervals=tuple(TIMEFRAMES.keys()))
+        # st.write(f"Loading {NIFTY_TICKER} benchmark OHLC...")
+        # load_multi_interval(NIFTY_TICKER, config["start_date"], config["end_date"],
+        #                      data_dir=config["data_dir"], intervals=tuple(TIMEFRAMES.keys()))
 
         st.write("Running zone detection, backtest & scoring (your real backend)...")
         results = get_strategy_results(
