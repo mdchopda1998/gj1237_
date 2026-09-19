@@ -41,7 +41,7 @@ def _render_ratio_controls(ratio: dict) -> dict:
     )
 
     preset_options = list(DAILY_PRESETS.keys()) + ["Custom"]
-    preset_kwargs = {} if "ratio_preset_select" in st.session_state else {"index": 1}
+    preset_kwargs = {} if "ratio_preset_select" in st.session_state else {"index": 0}
     preset_name = st.sidebar.selectbox(
         "Daily (1d) preset", options=preset_options,
         key="ratio_preset_select", **preset_kwargs,
