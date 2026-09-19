@@ -64,9 +64,19 @@ def _composite_gauge(score) -> go.Figure:
         },
         title={"text": "Composite Score", "font": {"color": p["text_muted"], "family": FONT_STACK, "size": 13}},
     ))
+
+    badge_html = _edge_badge(score)
+    # 2. Add it as an annotation at the bottom center of the canvas
+    fig.add_annotation(
+        text=badge_html,
+        xref="paper", yref="paper",
+        x=0.5, y=-0.1,  # Adjust 'y' slightly up or down to place it perfectly under the arc
+        showarrow=False,
+        align="center"
+    )
+
     _theme_layout(fig, height=220, margin=dict(l=20, r=20, t=40, b=10))
     return fig
-
 
 def _equity_curve(trade_log) -> go.Figure:
     """
@@ -94,10 +104,10 @@ def _render_metric_cards(m: dict, trade_log=None, initial_capital=None):
     left, right = st.columns([1, 2])
     with left:
         st.plotly_chart(_composite_gauge(m.get("Composite Score")), use_container_width=True, key="composite_gauge_chart")
-        st.markdown(
-            f'<div style="text-align:center;margin-top:-0.5rem;">{_edge_badge(m.get("Composite Score"))}</div>',
-            unsafe_allow_html=True,
-        )
+        # st.markdown(
+        #     f'<div style="text-align:center;margin-top:-0.5rem;">{_edge_badge(m.get("Composite Score"))}</div>',
+        #     unsafe_allow_html=True,
+        # )
     with right:
         pf = m.get("Profit Factor")
         is_pf_nan = isinstance(pf, float) and math.isnan(pf)
