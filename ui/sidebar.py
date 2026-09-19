@@ -37,11 +37,10 @@ def _mark_custom():
 def _render_ratio_controls(ratio: dict) -> dict:
     st.sidebar.markdown(f"##### {icon_span('tune', size=16)} Zone Detection Ratios", unsafe_allow_html=True)
     st.sidebar.caption(
-        "Your real backend currently only reads ratio['GEN.NS'][interval] "
-        "regardless of ticker - these controls edit that shared config."
+        "Ratio's for Average True Range (ATR), TR, Body Size (BS)"
     )
 
-    preset_options = ["Custom"] + list(DAILY_PRESETS.keys())
+    preset_options = list(DAILY_PRESETS.keys()) + ["Custom"]
     preset_kwargs = {} if "ratio_preset_select" in st.session_state else {"index": 1}
     preset_name = st.sidebar.selectbox(
         "Daily (1d) preset", options=preset_options,
@@ -62,9 +61,9 @@ def _render_ratio_controls(ratio: dict) -> dict:
     if preset_name != "Custom":
         ratio["GEN.NS"]["1d"] = {k: dict(v) for k, v in DAILY_PRESETS[preset_name].items()}
 
-    with st.sidebar.expander("Advanced: edit TR/ATR & Body/TR thresholds", expanded=False):
+    with st.sidebar.expander("Advanced Thresholds", expanded=False):
         st.caption(
-            f"Showing **{preset_name}** Mayur values below."
+            f"Showing **{preset_name}** values below."
             if preset_name != "Custom" else
             "Showing **Custom** values below (edited from whichever preset was last selected)."
         )
@@ -161,12 +160,16 @@ def render_sidebar() -> dict:
 
     ticker = _render_ticker_picker()
 
+    st.sidebar.divider()
+
     st.sidebar.markdown(f"{icon_span('calendar_month', size=14)} **Date Range**", unsafe_allow_html=True)
     d1, d2 = st.sidebar.columns(2)
     with d1:
         start_date = st.date_input("Start Date", value=date(2021, 1, 1), key="start_date_input")
     with d2:
         end_date = st.date_input("End Date", value=date.today(), key="end_date_input")
+
+    st.sidebar.divider()
 
     risk_pct = st.sidebar.slider(
         "Risk per Trade (%)", min_value=0.1, max_value=5.0, value=1.0, step=0.1,
@@ -186,6 +189,8 @@ def render_sidebar() -> dict:
                  "Falls back to a live yfinance fetch if a file isn't found there "
                  "(also used to fetch the ^NSEI Nifty benchmark).",
         )
+
+    st.sidebar.divider()
 
     ratio = _render_ratio_controls(default_ratio())
 

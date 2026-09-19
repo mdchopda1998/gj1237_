@@ -13,12 +13,12 @@ from ui.style import inject_global_css, app_header
 from ui.tabs import charts_tab, metrics_tab, trade_log_tab, batch_tab, score_tab
 from zone_identification_multibase import NIFTY_TICKER, TIMEFRAMES
 
-st.set_page_config(page_title="SMC Scanner & Backtester", layout="wide", page_icon=":material/candlestick_chart:")
+st.set_page_config(page_title="GJ1-2-37", layout="wide", page_icon=":material/candlestick_chart:")
 
 # Bump this on every delivered zip. If this string doesn't match what you
 # expect to see in the header badges, you're running stale files - re-unzip
 # and replace the WHOLE folder rather than copying individual files over.
-APP_BUILD = "2026-09-14-mockup-polish-v1"
+APP_BUILD = "2026-08-13"
 
 
 def _run_analysis_with_status(config: dict):
@@ -102,8 +102,8 @@ def main():
             subtitle="Smart Money Concepts zone detection, backtesting & scoring",
             icon="candlestick_chart",
             badges=[
-                {"text": f"Build {APP_BUILD.split('-', 1)[-1]}", "muted": True},
-                {"text": f"Streamlit {st.__version__}", "muted": True},
+                {"text": f"Jay Murlidhar", "muted": True},
+                {"text": f"Rules - Persistence - Patience", "muted": True},
                 status_badge,
             ],
         )

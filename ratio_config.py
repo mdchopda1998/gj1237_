@@ -25,55 +25,48 @@ that's what you were using them for.
 import copy
 
 DEFAULT_RATIO = {
-    "ORG.NS": {
-        "1d": {
-            "Exciting": {"TR_ATR": 0.5, "BS_TR": 0.5},
-            "Base": {"TR_ATR": 1.0, "BS_TR": 0.4},
-            "Explosive": {"TR_ATR": 1.2, "BS_TR": 0.7},
-        },
-    },
     "GEN.NS": {
         "1d": {
-            "Exciting": {"TR_ATR": 0.5, "BS_TR": 0.6},
-            "Base": {"TR_ATR": 1.2, "BS_TR": 0.5},
-            "Explosive": {"TR_ATR": 1.2, "BS_TR": 0.6},
+            "Exciting"  : {"TR_ATR": 0.5, "BS_TR": 0.6},
+            "Base"      : {"TR_ATR": 1.2, "BS_TR": 0.5},
+            "Explosive" : {"TR_ATR": 1.2, "BS_TR": 0.6},
         },
         "1wk": {
-            "Exciting": {"TR_ATR": 0.4, "BS_TR": 0.5},
-            "Base": {"TR_ATR": 1.3, "BS_TR": 0.4},
-            "Explosive": {"TR_ATR": 0.8, "BS_TR": 0.5},
+            "Exciting"  : {"TR_ATR": 0.4, "BS_TR": 0.5},
+            "Base"      : {"TR_ATR": 1.3, "BS_TR": 0.4},
+            "Explosive" : {"TR_ATR": 0.8, "BS_TR": 0.5},
         },
         "1mo": {
-            "Exciting": {"TR_ATR": 0.4, "BS_TR": 0.5},
-            "Base": {"TR_ATR": 1.3, "BS_TR": 0.4},
-            "Explosive": {"TR_ATR": 0.4, "BS_TR": 0.5},
+            "Exciting"  : {"TR_ATR": 0.4, "BS_TR": 0.5},
+            "Base"      : {"TR_ATR": 1.3, "BS_TR": 0.4},
+            "Explosive" : {"TR_ATR": 0.4, "BS_TR": 0.5},
         },
     },
 }
 
 # Your test_scenarios dict, for the daily (1d) GEN.NS ratio specifically.
 DAILY_PRESETS = {
-    "Standard": {
-        "Exciting": {"TR_ATR": 0.5, "BS_TR": 0.5},
-        "Base": {"TR_ATR": 1.0, "BS_TR": 0.4},
-        "Explosive": {"TR_ATR": 1.2, "BS_TR": 0.7},
-    },
-    "Aggressive_Explosive": {
-        "Exciting": {"TR_ATR": 0.5, "BS_TR": 0.5},
-        "Base": {"TR_ATR": 1.0, "BS_TR": 0.4},
-        "Explosive": {"TR_ATR": 1.5, "BS_TR": 0.8},
-    },
-    "Tight_Base": {
-        "Exciting": {"TR_ATR": 0.5, "BS_TR": 0.5},
-        "Base": {"TR_ATR": 0.8, "BS_TR": 0.3},
-        "Explosive": {"TR_ATR": 1.2, "BS_TR": 0.7},
-    },
     # Backtested against SAIL_NS_1d.csv earlier in this project (41 zones,
     # 63.9% win rate, +0.92R expectancy) - included as a fourth preset.
-    "SAIL_Backtested": {
-        "Exciting": {"TR_ATR": 0.5, "BS_TR": 0.6},
-        "Base": {"TR_ATR": 1.2, "BS_TR": 0.5},
-        "Explosive": {"TR_ATR": 1.2, "BS_TR": 0.6},
+    "SAIL_Backtested"   : {
+        "Exciting"      : {"TR_ATR": 0.5, "BS_TR": 0.6},
+        "Base"          : {"TR_ATR": 1.2, "BS_TR": 0.5},
+        "Explosive"     : {"TR_ATR": 1.2, "BS_TR": 0.6},
+    },    
+    "Standard": {
+        "Exciting"      : {"TR_ATR": 0.5, "BS_TR": 0.5},
+        "Base"          : {"TR_ATR": 1.0, "BS_TR": 0.4},
+        "Explosive"     : {"TR_ATR": 1.2, "BS_TR": 0.7},
+    },
+    "Aggressive_Explosive": {
+        "Exciting"      : {"TR_ATR": 0.5, "BS_TR": 0.5},
+        "Base"          : {"TR_ATR": 1.0, "BS_TR": 0.4},
+        "Explosive"     : {"TR_ATR": 1.5, "BS_TR": 0.8},
+    },
+    "Tight_Base": {
+        "Exciting"      : {"TR_ATR": 0.5, "BS_TR": 0.5},
+        "Base"          : {"TR_ATR": 0.8, "BS_TR": 0.3},
+        "Explosive"     : {"TR_ATR": 1.2, "BS_TR": 0.7},
     },
 }
 
