@@ -79,9 +79,7 @@ def _composite_gauge(score) -> go.Figure:
             )
         ]
     )
-    
 
-    )
 
     _theme_layout(fig, height=220, margin=dict(l=20, r=20, t=40, b=10))
     return fig
