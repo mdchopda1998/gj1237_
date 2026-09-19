@@ -154,7 +154,10 @@ def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
     ratio = ratio or default_ratio()
     ts_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    st.write(f"Loading {ticker} OHLC (CSV-first, live fallback)...")
     ticker_dfs, ticker_sources = _load_ticker_across_timeframes(ticker, start_date, end_date, data_dir)
+
+    st.write(f"Loading {NIFTY_TICKER} benchmark OHLC...")
     nifty_zones, nifty_sources = _build_nifty_zone_dfs(start_date, end_date, data_dir, ratio)
 
     data = {ticker: ticker_dfs}
