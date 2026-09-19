@@ -64,23 +64,6 @@ def _composite_gauge(score) -> go.Figure:
         },
         title={"text": "Composite Score", "font": {"color": p["text_muted"], "family": FONT_STACK, "size": 13}},
     ))
-
-    fig.update_layout(
-        annotations=[
-            # Top Title
-            # Center Number (Locks the value in place)
-            dict(
-                text=str(score),
-                x=0.5, y=0.15, # Placed exactly inside the hollow of the semi-circle arc
-                showarrow=False,
-                font={"color": p["text"], "family": FONT_STACK, "size": 36, "weight": "bold"},
-                xref="paper", yref="paper",
-                xanchor="center", yanchor="center"
-            )
-        ]
-    )
-
-
     _theme_layout(fig, height=220, margin=dict(l=20, r=20, t=40, b=10))
     return fig
 
