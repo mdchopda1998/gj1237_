@@ -69,22 +69,22 @@ def _zone_bounds(zone_df: pd.DataFrame, zdate, zone: pd.Series, trim_at_breach: 
     is_breached = False
     breach_date = None
     if trim_at_breach:
-        # idx_pos = zone_df.index.get_loc(zdate)
-        # closes = zone_df["Close"].values
-        # distal = zone["Distal"]
-        # is_demand = bool(zone["Is Demand"])
-        # future_closes = closes[idx_pos + 1:]
-        # breach_mask = (future_closes <= distal) if is_demand else (future_closes >= distal)
-        # breach_positions = np.where(breach_mask)[0]
-        # if breach_positions.size > 0:
-        #     breach_date = zone_df.index[breach_positions[0] + idx_pos + 1]
-        #     x1 = breach_date
-        #     is_breached = True
-
-        if not pd.isna(zone_df["Exit Date"]):
-            x1 = zone_df["Exit Date"]
-            breach_date = zone_df["Exit Date"]
+        idx_pos = zone_df.index.get_loc(zdate)
+        closes = zone_df["Close"].values
+        distal = zone["Distal"]
+        is_demand = bool(zone["Is Demand"])
+        future_closes = closes[idx_pos + 1:]
+        breach_mask = (future_closes <= distal) if is_demand else (future_closes >= distal)
+        breach_positions = np.where(breach_mask)[0]
+        if breach_positions.size > 0:
+            breach_date = zone_df.index[breach_positions[0] + idx_pos + 1]
+            x1 = breach_date
             is_breached = True
+
+        # if not pd.isna(zone_df["Exit Date"]):
+        #     x1 = zone_df["Exit Date"]
+        #     breach_date = zone_df["Exit Date"]
+        #     is_breached = True
 
 
 
