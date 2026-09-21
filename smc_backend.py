@@ -790,14 +790,14 @@ def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_d
                 break
         df_ts.at[df.index[idx], 'Strength'] = strength_count
 
-        # --- 3. Number of Base Candles ---
-        base_count = 0
-        for i in range(idx-1, -1, -1):
-            if df.iloc[i]['Is_Base']:
-                base_count += 1
-            else:
-                break
-        df_ts.at[df.index[idx], 'Base Count'] = base_count
+        # --- 3. Number of Base Candles --- ## As it already being done in zone identification
+        # base_count = 0
+        # for i in range(idx-1, -1, -1):
+        #     if df.iloc[i]['Is_Base']:
+        #         base_count += 1
+        #     else:
+        #         break
+        # df_ts.at[df.index[idx], 'Base Count'] = base_count
 
         # --- 3a. Gap Logic ---
         # flg = df.iloc[idx-2:idx+1]['Gapped'].any()
