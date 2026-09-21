@@ -40,10 +40,16 @@ PALETTE = {
     "brand": "#3861FB",           # brand/primary
     "brand_soft": "#EAF0FF",     # brand/primary-soft
     "accent": "#00C896",          # accent/teal
+
     "bull": "#16A34A",            # bull/green
+    "mbull": "#0072B2",            # bull/Blue
+    
     "bull_soft": "#E7F8ED",      # bull/green-soft (solid - badges, cell backgrounds)
     "bull_overlay": "rgba(22,163,74,0.12)",   # translucent - chart zone fills specifically
+
     "bear": "#E5484D",            # bear/red
+    "mbear": "#E69F00",            # bear/orange
+
     "bear_soft": "#FCEBEC",      # bear/red-soft (solid - badges, cell backgrounds)
     "bear_overlay": "rgba(229,72,77,0.12)",   # translucent - chart zone fills specifically
     "warn": "#F5A623",            # warn/amber

@@ -246,8 +246,10 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
     candle = go.Candlestick(
         x=zone_df.index, open=zone_df["Open"], high=zone_df["High"],
         low=zone_df["Low"], close=zone_df["Close"], name=ticker,
-        increasing_line_color=p["bull"], increasing_fillcolor=p["bull"],
-        decreasing_line_color=p["bear"], decreasing_fillcolor=p["bear"],
+        # increasing_line_color=p["bull"], increasing_fillcolor=p["bull"],
+        # decreasing_line_color=p["bear"], decreasing_fillcolor=p["bear"],
+        increasing_line_color=p["mbull"], increasing_fillcolor=p["mbull"],
+        decreasing_line_color=p["mbear"], decreasing_fillcolor=p["mbear"],        
     )
     if has_volume:
         fig.add_trace(candle, row=1, col=1)
