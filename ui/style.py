@@ -47,7 +47,7 @@ PALETTE = {
     "bull_soft": "#E7F8ED",      # bull/green-soft (solid - badges, cell backgrounds)
 
     "bull_overlay": "rgba(22,163,74,0.12)",   # translucent - chart zone fills specifically
-    "mbull_overlay": "#0072B2",   # translucent - chart zone fills specifically
+    "mbull_overlay": "rgba(0, 114, 178, 0.12)",   # translucent - chart zone fills specifically
     
 
     "bear": "#E5484D",            # bear/red
@@ -56,7 +56,7 @@ PALETTE = {
     "bear_soft": "#FCEBEC",      # bear/red-soft (solid - badges, cell backgrounds)
 
     "bear_overlay": "rgba(229,72,77,0.12)",   # translucent - chart zone fills specifically
-    "mbear_overlay": "#E69F00",   # translucent - chart zone fills specifically
+    "mbear_overlay": "rgba(230, 159, 0, 0.12)",   # translucent - chart zone fills specifically
 
     "warn": "#F5A623",            # warn/amber
     "warn_soft": "#FDF3E1",      # warn/amber-soft
