@@ -296,7 +296,7 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
         fig.add_shape(
             type="rect", x0=x0, x1=x1,
             y0=zone["Distal"], y1=zone["Proximal"],
-            fillcolor=color, line=dict(width=1, color=(p["bull"] if is_demand else p["bear"])),
+            fillcolor=color, line=dict(width=1, color=(p["mbull"] if is_demand else p["mbear"])),
             layer="below",
             **shape_kwargs,
         )
