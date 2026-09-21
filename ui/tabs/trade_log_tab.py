@@ -114,7 +114,7 @@ def render(config: dict, results):
 
         active = get_active_filters(results)
         filtered_zones = filter_zones(
-            zones_1d, min_base_count=active["min_base_count"], zone_types=active["zone_types"],
+            zones_1d, max_base_count=active["max_base_count"], zone_types=active["zone_types"],
             pattern_types=active["pattern_types"], trade_score=results.trade_score,
             min_strength=active["min_strength"], fresh_only=active["fresh_only"],
             bool_filters=active["bool_filters"],
@@ -126,7 +126,7 @@ def render(config: dict, results):
         all_outcomes = set(shared_outcome_options(trade_log))
         outcome_narrowed = set(active["outcome_types"]) != all_outcomes and all_outcomes
         st.caption(
-            f"Chart Filters: Min Base Count \u2265 {active['min_base_count']}, "
+            f"Chart Filters: Min Base Count \u2265 {active['max_base_count']}, "
             f"Zone Type in {list(active['zone_types'])}, Pattern in {list(active['pattern_types'])}"
             + (f", Min Strength \u2265 {active['min_strength']}" if active["min_strength"] is not None else "")
             + (", Fresh only" if active["fresh_only"] else "")
