@@ -45,7 +45,7 @@ def render(config: dict, results):
 
         f1, f2, f3 = st.columns([2, 2, 2])
         with f1:
-            st.slider("Max Base Count", 1, 10, 10, key="max_base_count")
+            st.slider("Min Base Count", 1, 10, 1, key="min_base_count")
         with f2:
             if hasattr(st, "pills"):
                 st.pills("Zone Type", ["Demand", "Supply"], default=["Demand", "Supply"],
@@ -149,7 +149,7 @@ def render(config: dict, results):
 
             filtered = filter_zones(
                 zone_df,
-                max_base_count=active["max_base_count"],
+                min_base_count=active["min_base_count"],
                 zone_types=active["zone_types"],
                 pattern_types=active["pattern_types"],
                 trade_score=score_df,

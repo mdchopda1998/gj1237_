@@ -415,6 +415,8 @@ def classify_candles(df,ratio):
     df['Is_Explosive'] = (tr / atr > ratio['Explosive']['TR_ATR']) & ((body_size.abs() / tr) > ratio['Explosive']['BS_TR'])
 
     # df['Is_Exciting'] = df['Is_Exciting'] & ~df['Is_Explosive']
+
+
     return df
 
 def compute_gap_flags(df: pd.DataFrame,gap_threshold=1.0) -> pd.Series:
@@ -632,7 +634,7 @@ def identity_zones_with_multibase(df,ratio,max_base_candles=10):
 
   # df['date']            = df.index.strftime('%Y-%m-%d')
   df['Zone_Created']    = zone_created
-  df['Base Count']      = base_len
+  df['Base Count']     = base_len
   df['Leg_In_Idx']      = leg_in_idx
   df['Base_Start_Idx']  = base_start_idx
   df['Base_End_Idx']    = base_end_idx
@@ -788,14 +790,14 @@ def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_d
                 break
         df_ts.at[df.index[idx], 'Strength'] = strength_count
 
-        # --- 3. Number of Base Candles ---      ## Already computed in Zone Identification
-        # base_count = 0
-        # for i in range(idx-1, -1, -1):
-        #     if df.iloc[i]['Is_Base']:
-        #         base_count += 1
-        #     else:
-        #         break
-        # df_ts.at[df.index[idx], 'Base Count'] = base_count
+        # --- 3. Number of Base Candles ---
+        base_count = 0
+        for i in range(idx-1, -1, -1):
+            if df.iloc[i]['Is_Base']:
+                base_count += 1
+            else:
+                break
+        df_ts.at[df.index[idx], 'Base Count'] = base_count
 
         # --- 3a. Gap Logic ---
         # flg = df.iloc[idx-2:idx+1]['Gapped'].any()

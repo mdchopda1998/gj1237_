@@ -172,7 +172,7 @@ def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
             data_sources=ticker_sources, nifty_data_sources=nifty_sources,
             error=f"Backend raised {type(e).__name__}: {e}",
             analysis_timestamp=ts_now,
-        ) 
+        )
 
     zones = out.get("zones") or {}
     if not zones or zones.get("1d") is None:

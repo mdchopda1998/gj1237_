@@ -58,7 +58,7 @@ def get_active_filters(results) -> dict:
     all_outcomes = outcome_options(trade_log)
 
     return dict(
-        max_base_count=st.session_state.get("max_base_count", 1),
+        min_base_count=st.session_state.get("min_base_count", 1),
         zone_types=tuple(st.session_state.get("zone_types") or ["Demand", "Supply"]),
         pattern_types=tuple(st.session_state.get("pattern_types") or ["Continuous", "Reversal"]),
         min_strength=st.session_state.get("min_strength") if st.session_state.get("use_strength") else None,
