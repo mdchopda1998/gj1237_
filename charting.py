@@ -264,7 +264,7 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
     for zdate, zone in zones.iterrows():
         is_demand = bool(zone["Is Demand"])
         x0, x1, is_closed, _, outcome = _zone_bounds(zone_df, zdate, zone, trim_mode, trade_log)
-        color = p["bull_overlay"] if is_demand else p["bear_overlay"]
+        color = p["mbull_overlay"] if is_demand else p["mbear_overlay"]
         # Short label: Type initial + Base Count (e.g. "D3", "S2"), matching
         # a compact chart-tag convention - Strength is appended only when
         # meaningfully available (daily timeframe).
