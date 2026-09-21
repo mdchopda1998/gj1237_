@@ -788,7 +788,7 @@ def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_d
                 break
         df_ts.at[df.index[idx], 'Strength'] = strength_count
 
-        # --- 3. Number of Base Candles ---
+        # --- 3. Number of Base Candles ---      ## Already computed in Zone Identification
         # base_count = 0
         # for i in range(idx-1, -1, -1):
         #     if df.iloc[i]['Is_Base']:

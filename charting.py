@@ -128,7 +128,8 @@ def _zone_bounds(zone_df: pd.DataFrame, zdate, zone: pd.Series, trim_mode: str =
     return x0, x1, is_closed, close_date, outcome
 
 
-def filter_zones(zone_df: pd.DataFrame, min_base_count: int = 1,
+# def filter_zones(zone_df: pd.DataFrame, min_base_count: int = 1,
+def filter_zones(zone_df: pd.DataFrame, max_base_count: int = 10,
                   zone_types=("Demand", "Supply"), pattern_types=("Continuous", "Reversal"),
                   trade_score: pd.DataFrame = None, min_strength: int = None,
                   fresh_only: bool = False, bool_filters: dict = None,
@@ -165,7 +166,8 @@ def filter_zones(zone_df: pd.DataFrame, min_base_count: int = 1,
     zones = zone_df[zone_df["Zone_Created"] == True].copy()  # noqa: E712
 
     if "Base Count" in zones.columns:
-        zones = zones[zones["Base Count"] >= min_base_count]
+        # zones = zones[zones["Base Count"] >= min_base_count]
+        zones = zones[zones["Base Count"] <= max_base_count]
 
     if "Is Demand" in zones.columns and zone_types:
         wanted_is_demand = {"Demand": True, "Supply": False}
