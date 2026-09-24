@@ -114,6 +114,7 @@ class StrategyResults:
     zones: dict                          # {'1d': df, '1wk': df, '1mo': df} - real columns, for plotting
     trade_log: pd.DataFrame              # df_rm, bridged with Outcome/Date Created
     trade_score: pd.DataFrame = field(default_factory=pd.DataFrame)  # df_ts (1d only) - Strength/Freshness/BOS/OB/...
+    trade_bt : pd.DataFrame = field(default_factory=pd.DataFrame)  # df_bt (1d only)
     data_sources: dict = field(default_factory=dict)       # ticker OHLC sources
     nifty_data_sources: dict = field(default_factory=dict)  # nifty OHLC sources
     metrics: dict = field(default_factory=dict)
@@ -188,6 +189,10 @@ def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
         trade_score = pd.DataFrame()
 
     df_bt = out.get("anal", {}).get("bt")
+    if df_bt is None:
+        df_bt = pd.DataFrame()
+
+
     df_rm = out.get("anal", {}).get("rm")
 
     metrics = {}
@@ -212,7 +217,7 @@ def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
             trade_log.attrs["metrics_error"] = f"{type(e).__name__}: {e}"
 
     return StrategyResults(
-        ticker=ticker, zones=zones, trade_log=trade_log, trade_score=trade_score,
+        ticker=ticker, zones=zones, trade_log=trade_log, trade_score=trade_score,trade_bt=df_bt,
         data_sources=ticker_sources, nifty_data_sources=nifty_sources,
-        metrics=metrics, analysis_timestamp=ts_now,
+        metrics=metrics, analysis_timestamp=ts_now
     )

@@ -177,6 +177,40 @@ def _render_metric_cards(m: dict, trade_log=None, initial_capital=None):
     )
 
 
+
+def _style_trade_log(df):
+    """Colors Outcome (green/red) and every signed numeric outcome column
+    (Trade_PnL, % Return, R Multiple) consistently with the app's
+    bull/bear color language - purely visual, no data changes."""
+    p = PALETTE
+
+    def color_outcome(val):
+        if val == "Profit":
+            return f"color:{p['bull']};font-weight:600"
+        if isinstance(val, str) and "loss" in val.lower():
+            return f"color:{p['bear']};font-weight:600"
+        return ""
+
+    def color_signed(val):
+        try:
+            v = float(val)
+        except (TypeError, ValueError):
+            return ""
+        if v > 0:
+            return f"color:{p['bull']}"
+        if v < 0:
+            return f"color:{p['bear']}"
+        return ""
+
+    styler = df.style
+    if "Outcome" in df.columns:
+        styler = styler.map(color_outcome, subset=["Outcome"])
+    for col in ["Trade_PnL", "% Return", "R Multiple"]:
+        if col in df.columns:
+            styler = styler.map(color_signed, subset=[col])
+    return styler
+
+
 def render(config: dict, results):
     if results is None:
         st.info("Run an analysis to see backtest metrics.")
@@ -203,7 +237,8 @@ def render(config: dict, results):
     )
 
     if not use_filtered:
-        _render_metric_cards(m, trade_log=results.trade_log, initial_capital=config.get('initial_capital'))
+        _render_metric_cards(m, trade_log=results.trade_bt, initial_capital=config.get('initial_capital'))
+        st.dataframe(_style_trade_log(results.), use_container_width=True, hide_index=True)
         return
 
     # Mirror the exact same filter state the Charts tab set in session_state -

@@ -982,10 +982,8 @@ def run_risk_management_simulation(df_bt, initial_capital, risk_percentage_per_t
     Returns:
         pd.DataFrame: The summary_df with added risk management columns.
     """
-    # valid_outcome = (df_bt['Outcome'] == 'Profit') | (df_bt['Outcome'] == 'Stop Loss')
-    # df_rm         = df_bt[valid_outcome].copy()
-
-    df_rm         = df_bt.copy()
+    valid_outcome = (df_bt['Outcome'] == 'Profit') | (df_bt['Outcome'] == 'Stop Loss')
+    df_rm         = df_bt[valid_outcome].copy()
 
     # Initialize Capital and other columns with float dtype
     df_rm['Capital_At_Entry'] = np.float64(initial_capital)
