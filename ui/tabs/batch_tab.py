@@ -50,14 +50,15 @@ def render(config: dict):
     if hasattr(st, "pills"):
         source = st.pills(
             "Ticker source",
-            ["NIFTY 50", "NIFTY Next 50", "NIFTY 100", "Custom list", "Upload CSV"],
+            ["NIFTY 50", "NIFTY Next 50", "NIFTY 100", "NIFTY Midcap 150","NIFTY Smallcap 250", "Custom list", "Upload CSV"],
             default="NIFTY 50", key="batch_source",
         )
         source = source or "NIFTY 50"
     else:
         source = st.radio(
             "Ticker source",
-            ["NIFTY 50", "NIFTY Next 50", "NIFTY 100", "Custom list", "Upload CSV"],
+            ["NIFTY 50", "NIFTY Next 50", "NIFTY 100", "NIFTY Midcap 150","NIFTY Smallcap 250", "Custom list", "Upload CSV"],
+            # ["NIFTY 50", "NIFTY Next 50", "NIFTY 100", "Custom list", "Upload CSV"],
             horizontal=True, key="batch_source",
         )
 
