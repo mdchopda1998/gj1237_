@@ -237,8 +237,8 @@ def render(config: dict, results):
     )
 
     if not use_filtered:
-        _render_metric_cards(m, trade_log=results.trade_bt, initial_capital=config.get('initial_capital'))
-        st.dataframe(_style_trade_log(results.), use_container_width=True, hide_index=True)
+        _render_metric_cards(m, trade_log=results.trade_log, initial_capital=config.get('initial_capital'))
+        st.dataframe(_style_trade_log(results.trade_bt), use_container_width=True, hide_index=True)
         return
 
     # Mirror the exact same filter state the Charts tab set in session_state -
