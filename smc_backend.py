@@ -720,33 +720,22 @@ def check_refined_htf_support(daily_row, htf_df, creation_date):
 def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_df=None, nifty_1wk_df=None, nifty_1mo_df=None):
     """Calculates a score for each zone based on Freshness, Strength, Base Count, Weekly Trend, and HTF Support."""
     # Initialize columns
-    df_ts = df[df['Zone_Created'] == True].copy()
+    # df_ts = df[df['Zone_Created'] == True].copy()
+    df_ts = df[df['Zone_Created'] == True][['Is Continuous','Is Demand','Base Count']].copy()
 
-    df_ts['Freshness'] = False
+    ts_cols = ['Freshness','Strength','Gapped','High Volume','Trending','Swing Point','BOS','OB','Sweep',
+               'Trend Support','ITF Support','HTF Support','N_LTF Support','N_ITF Support','N_HTF Support']
+    for col in ts_cols:
+       df_ts[col] = False
+
     df_ts['Strength'] = 0
-    df_ts['Gapped'] = False
-    df_ts['High Volume'] = False
-    df_ts['Trending'] = False
-    df_ts['Swing Point'] = False
-    df_ts['BOS'] = False
-    df_ts['OB'] = False
-    df_ts['Sweep'] = False
-    df_ts['Trend Support'] = False
-    df_ts['ITF Support'] = False
-    df_ts['HTF Support'] = False
-    df_ts['N_LTF Support'] = False
-    df_ts['N_ITF Support'] = False
-    df_ts['N_HTF Support'] = False
-    # df_ts['HTF_Support_w'] = False
-    # df_ts['Nifty_1d_Support'] = False # New column for Nifty 50 daily support
-    # df_ts['Nifty_1wk_Support'] = False # New column for Nifty 50 weekly support
-    # df_ts['Nifty_1mo_Support'] = False # New column for Nifty 50 monthly support
 
-    df_ts = df_ts.drop(columns=['Close', 'High', 'Low', 'Open', 'Volume', 'TR', 'ATR', 'Is_Exciting',
-                                'Is_Base','Is_Explosive','Zone_Created','Proximal','Distal',
-                                'Target','Swing_High','Swing_Low','BOS_Bull', 'BOS_Bear','High_Volume',
-                                'Sweep_High', 'Sweep_Low', 'Bullish_OB', 'Bearish_OB',
-                                'Leg_In_Idx', 'Base_Start_Idx', 'Base_End_Idx'])
+    # df_ts = df_ts.drop(columns=['Open','Close', 'High', 'Low','Volume', 
+    #                             'TR', 'ATR', 'Is_Exciting','Is_Base','Is_Explosive',
+    #                             'Zone_Created','Proximal','Distal','Target',
+    #                             'Swing_High','Swing_Low','BOS_Bull', 'BOS_Bear','High_Volume',
+    #                             'Sweep_High', 'Sweep_Low', 'Bullish_OB', 'Bearish_OB',
+    #                             'Leg_In_Idx', 'Base_Start_Idx', 'Base_End_Idx'])
 
     # Insert ticker as first column
     df_ts.insert(0, 'Ticker', ticker)
@@ -764,6 +753,8 @@ def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_d
 
         row = df.iloc[idx]
         prox, dist = row['Proximal'], row['Distal']
+        leg_in_idx = row['Leg_In_Idx']
+
         if pd.isna(prox) or pd.isna(dist):
             continue
 
@@ -790,6 +781,10 @@ def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_d
                 break
         df_ts.at[df.index[idx], 'Strength'] = strength_count
 
+        # ind_st = idx - 2
+        ind_st = leg_in_idx
+        ind_end = idx + strength_count
+
         # --- 3. Number of Base Candles --- ## As it already being done in zone identification
         # base_count = 0
         # for i in range(idx-1, -1, -1):
@@ -801,37 +796,40 @@ def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_d
 
         # --- 3a. Gap Logic ---
         # flg = df.iloc[idx-2:idx+1]['Gapped'].any()
-        flg = df.iloc[idx-2:idx+strength_count]['Gapped'].any()
+        # flg = df.iloc[idx-2:idx+strength_count]['Gapped'].any()
+        flg = df.iloc[ind_st:ind_end]['Gapped'].any()
         df_ts.at[df.index[idx], 'Gapped'] = flg
 
         # --- 3b. Volume Z Score ---
         # flg = df.iloc[idx-2:idx+1]['High_Volume'].any()
-        flg = df.iloc[idx-2:idx+strength_count]['High_Volume'].any()
+        # flg = df.iloc[idx-2:idx+strength_count]['High_Volume'].any()
+        flg = df.iloc[ind_st:ind_end]['High_Volume'].any()
         df_ts.at[df.index[idx], 'High Volume'] = flg
 
         # --- 3c. Choppiness Index ---
         # flg = df.iloc[idx-2:idx+1]['Trending'].any()
-        flg = df.iloc[idx-2:idx+strength_count]['Trending'].any()
+        # flg = df.iloc[idx-2:idx+strength_count]['Trending'].any()
+        flg = df.iloc[ind_st:ind_end]['Trending'].any()
         df_ts.at[df.index[idx], 'Trending'] = flg
 
         # --- 3d. Swing High/Low ---
-        flg1 = df.iloc[idx-2:idx+strength_count]['Swing_High'].any()
-        flg2 = df.iloc[idx-2:idx+strength_count]['Swing_Low'].any()
+        flg1 = df.iloc[ind_st:ind_end]['Swing_High'].any()
+        flg2 = df.iloc[ind_st:ind_end]['Swing_Low'].any()
         flg = flg1 or flg2
         df_ts.at[df.index[idx], 'Swing Point'] = flg
 
         # --- 3d. BOS_Bull / BOS_Bear ---
         if is_demand:
-          flg = df.iloc[idx-2:idx+strength_count]['BOS_Bull'].any()
+          flg = df.iloc[ind_end - 1]['BOS_Bull']
         else:
-          flg = df.iloc[idx-2:idx+strength_count]['BOS_Bear'].any()
+          flg = df.iloc[ind_end - 1]['BOS_Bear']
         df_ts.at[df.index[idx], 'BOS'] = flg
 
         # --- 3e. Sweep High / Sweeep Low ---
         if is_demand:
-          flg = df.iloc[idx-2:idx+strength_count]['Sweep_High'].any()
+          flg = df.iloc[ind_st:ind_end]['Sweep_Low'].any()
         else:
-          flg = df.iloc[idx-2:idx+strength_count]['Sweep_Low'].any()
+          flg = df.iloc[ind_st:ind_end]['Sweep_High'].any()
         df_ts.at[df.index[idx], 'Sweep'] = flg
 
         # --- 3f. Bullish_OB / Bearish_OB ---
@@ -840,8 +838,6 @@ def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_d
 
         # --- 4a. Weekly Timeframe Intermediate TF Support and Trend Favour ---
         if weekly_df is not None and not weekly_df.empty:
-          df_ts.at[df.index[idx], 'ITF Support'] = check_refined_htf_support(row, weekly_df, creation_date)
-
           available_weekly_dates = weekly_df.index[weekly_df.index <= creation_date]
           if not available_weekly_dates.empty:
             last_weekly_date = available_weekly_dates[-1]
@@ -849,6 +845,7 @@ def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_d
             if (is_demand and (w_trend==1)) or (not is_demand and (w_trend==-1)):
               df.at[df.index[idx], 'Trend Support'] = True
 
+          df_ts.at[df.index[idx], 'ITF Support'] = check_refined_htf_support(row, weekly_df, creation_date)
 
         # --- 4b. Monthly Timeframe Higher TF Support ---
         if monthly_df is not None and not monthly_df.empty:
@@ -915,7 +912,8 @@ def backtest_zones(ticker, df,realistic_fills=True):
         close_px = entry_candle['Close']
 
         if realistic_fills:
-          entry_price = min(open_px,prox) if is_demand else max(close_px,prox)
+        #   entry_price = min(open_px,prox) if is_demand else max(close_px,prox)
+          entry_price = min(open_px,prox) if is_demand else max(open_px,prox)
         else:
           entry_price = prox
 
@@ -957,6 +955,8 @@ def backtest_zones(ticker, df,realistic_fills=True):
               pierce = (worst_price - prox) / risk
           piercing_depth = max(0, min(1, pierce))
           df_bt.at[df.index[ind], 'Piercing_Depth'] = round(piercing_depth, 2)
+
+        risk = abs(entry_price - dist)
 
         df_bt.at[df.index[ind], 'Entry Date']   = df.index[entry_idx]
         df_bt.at[df.index[ind], 'Exit Date']    = df.index[exit_idx]
@@ -1022,7 +1022,8 @@ def run_risk_management_simulation(df_bt, initial_capital, risk_percentage_per_t
         df_rm.loc[index, 'Risk_Amount_Per_Trade'] = risk_amount_per_trade
 
         # Calculate Quantity
-        price_difference = abs(row['Proximal'] - row['Distal'])
+        # price_difference = abs(row['Proximal'] - row['Distal'])
+        price_difference = abs(row['Entry Price'] - row['Distal'])
         if price_difference == 0:
             quantity = 0
         else:
