@@ -10,7 +10,7 @@ from data_access import get_strategy_results
 from data_loading import load_multi_interval
 from ui.sidebar import render_sidebar
 from ui.right_panel import render_right_panel
-from ui.style import inject_global_css, app_header
+from ui.style import icon_span, inject_global_css, app_header
 from ui.tabs import charts_tab, metrics_tab, trade_log_tab, batch_tab, score_tab
 from zone_identification_multibase import NIFTY_TICKER, TIMEFRAMES
 
@@ -68,8 +68,9 @@ def main():
     # uses whatever is currently showing in the panel's widgets.
     main_col, params_col = st.columns([4, 1.3], gap="large")
 
-    with params_col:
-        config["zone_params"] = render_right_panel()
+    with params_col:        
+        with st.popover(f"{icon_span('tune', size=16)} Configuration"):
+            config["zone_params"] = render_right_panel()
 
     with main_col:
         # Reserve the header's visual slot at the very top of the page now,
