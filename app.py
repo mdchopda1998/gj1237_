@@ -69,8 +69,7 @@ def main():
     main_col, params_col = st.columns([4, 1.3], gap="large")
 
     with params_col:        
-        with st.popover(f"{icon_span('tune', size=16)} Configuration"):
-            config["zone_params"] = render_right_panel()
+        config["zone_params"] = render_right_panel()
 
     with main_col:
         # Reserve the header's visual slot at the very top of the page now,
