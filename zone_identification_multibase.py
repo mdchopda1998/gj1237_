@@ -117,6 +117,11 @@ class StrategyResults:
     trade_bt : pd.DataFrame = field(default_factory=pd.DataFrame)  # df_bt (1d only)
     data_sources: dict = field(default_factory=dict)       # ticker OHLC sources
     nifty_data_sources: dict = field(default_factory=dict)  # nifty OHLC sources
+    nifty_zones: dict = field(default_factory=dict)  # {'1d': df, '1wk': df, '1mo': df} - NIFTY 50's
+    # own zone-identified OHLC (same identity_zones_with_multibase output used for
+    # the N_LTF/N_ITF/N_HTF Support confluence scoring) - kept here purely so the
+    # Charts tab can plot the benchmark alongside the selected stock; never
+    # re-derived or modified beyond what scoring already computed.
     metrics: dict = field(default_factory=dict)
     error: Optional[str] = None          # set if the real backend raised
     analysis_timestamp: Optional[str] = None  # when this StrategyResults was computed
@@ -171,6 +176,7 @@ def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
         return StrategyResults(
             ticker=ticker, zones={}, trade_log=pd.DataFrame(),
             data_sources=ticker_sources, nifty_data_sources=nifty_sources,
+            nifty_zones=nifty_zones,
             error=f"Backend raised {type(e).__name__}: {e}",
             analysis_timestamp=ts_now,
         )
@@ -180,6 +186,7 @@ def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
         return StrategyResults(
             ticker=ticker, zones={}, trade_log=pd.DataFrame(),
             data_sources=ticker_sources, nifty_data_sources=nifty_sources,
+            nifty_zones=nifty_zones,
             error=f"No zones were identified for {ticker} with the current ratio settings.",
             analysis_timestamp=ts_now,
         )
@@ -218,6 +225,6 @@ def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
 
     return StrategyResults(
         ticker=ticker, zones=zones, trade_log=trade_log, trade_score=trade_score,trade_bt=df_bt,
-        data_sources=ticker_sources, nifty_data_sources=nifty_sources,
+        data_sources=ticker_sources, nifty_data_sources=nifty_sources, nifty_zones=nifty_zones,
         metrics=metrics, analysis_timestamp=ts_now
     )

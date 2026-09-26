@@ -62,6 +62,14 @@ def render(config: dict, results):
                 st.multiselect("Pattern", ["Continuous", "Reversal"], default=["Continuous", "Reversal"],
                                 key="pattern_types")
 
+        st.toggle(
+            "Show NIFTY 50 benchmark chart", value=True, key="show_nifty_chart",
+            help="Adds a NIFTY 50 zones chart below the selected stock's chart on "
+                 "each Daily/Weekly/Monthly tab - the same index zone-identification "
+                 "your backend already computes for the N_LTF/N_ITF/N_HTF Support "
+                 "confluence flags used in scoring, just rendered here too.",
+        )
+
         trim_options = list(TRIM_MODE_LABELS.values())
         trim_option_to_mode = {v: k for k, v in TRIM_MODE_LABELS.items()}
         if hasattr(st, "pills"):
@@ -172,6 +180,39 @@ def render(config: dict, results):
                 f"{len(filtered)} of {total_zones} zone(s) shown after filters "
                 f"\u00b7 Data source: {source_note}"
             )
+
+            if st.session_state.get("show_nifty_chart", True):
+                nifty_zones_by_tf = getattr(results, "nifty_zones", None) or {}
+                nifty_df = nifty_zones_by_tf.get(tf_key)
+                st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
+                if nifty_df is None or nifty_df.empty:
+                    st.info(f"NIFTY 50 {tf_label.lower()} benchmark data not available for this run.")
+                else:
+                    # Same Base Count / Zone Type / Pattern filters as the stock
+                    # chart above, applied to NIFTY 50's own zones - NIFTY isn't
+                    # scored/backtested (no trade_score/trade_log of its own),
+                    # so only the daily-agnostic filters apply here.
+                    nifty_filtered = filter_zones(
+                        nifty_df,
+                        max_base_count=active["max_base_count"],
+                        zone_types=active["zone_types"],
+                        pattern_types=active["pattern_types"],
+                    )
+                    nifty_fig = build_zone_figure(
+                        nifty_df, "NIFTY 50", tf_label,
+                        filtered_zones=nifty_filtered, trim_mode="breach",
+                    )
+                    chart_heading("NIFTY 50", tf_label, len(nifty_filtered))
+                    st.plotly_chart(nifty_fig, use_container_width=True, key=f"nifty_chart_{tf_key}")
+
+                    nifty_total = int(nifty_df["Zone_Created"].sum()) if "Zone_Created" in nifty_df.columns else 0
+                    nifty_sources = getattr(results, "nifty_data_sources", None) or {}
+                    nifty_source = nifty_sources.get(tf_key, "unknown")
+                    nifty_source_note = SOURCE_NOTES.get(nifty_source, nifty_source)
+                    st.caption(
+                        f"{len(nifty_filtered)} of {nifty_total} NIFTY 50 zone(s) shown after filters "
+                        f"\u00b7 Data source: {nifty_source_note}"
+                    )
 
             with st.expander(f"View {len(filtered)} filtered zone(s) as a table", expanded=False):
                 table = zones_display_table(filtered, trade_score=score_df, zone_df=zone_df,
