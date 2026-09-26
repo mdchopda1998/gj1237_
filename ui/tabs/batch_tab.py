@@ -118,6 +118,7 @@ def render(config: dict):
                     ticker, config["start_date"], config["end_date"],
                     config["risk_pct"], config["initial_capital"],
                     config["data_dir"], config["ratio"],
+                    config.get("zone_params"),
                 )
                 err = getattr(res, "error", None)
             except Exception as e:

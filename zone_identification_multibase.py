@@ -33,6 +33,7 @@ import streamlit as st
 import smc_backend as be
 from data_loading import load_multi_interval
 from ratio_config import default_ratio, resolve_gen_ratio
+from zone_params_config import default_zone_params
 
 NIFTY_TICKER = "^NSEI"
 TIMEFRAMES = {"1d": "Daily", "1wk": "Weekly", "1mo": "Monthly"}
@@ -91,18 +92,24 @@ def _load_ticker_across_timeframes(ticker: str, start_date, end_date, data_dir: 
 
 
 @st.cache_data(show_spinner=False)
-def _build_nifty_zone_dfs(start_date, end_date, data_dir: str, ratio: dict):
+def _build_nifty_zone_dfs(start_date, end_date, data_dir: str, ratio: dict, zone_params: dict = None):
     """
     Mirrors your driver script's:
         nifty_1d_df = identity_zones_with_multibase(data['^NSEI']['1d'], ratio['GEN.NS']['1d'])
     Returns (dict_of_dfs, dict_of_sources); any timeframe that errors out
     is set to None (calculate_trade_score already handles None gracefully).
     """
+    zp = default_zone_params()
+    if zone_params:
+        zp.update(zone_params)
+    zone_kwargs = {k: v for k, v in zp.items() if k != "weekly_trend_window"}
+
     dfs, sources = _load_ticker_across_timeframes(NIFTY_TICKER, start_date, end_date, data_dir)
     nifty_zones = {}
     for tf in TIMEFRAMES:
         try:
-            nifty_zones[tf] = be.identity_zones_with_multibase(dfs[tf].copy(), resolve_gen_ratio(tf, ratio))
+            nifty_zones[tf] = be.identity_zones_with_multibase(
+                dfs[tf].copy(), resolve_gen_ratio(tf, ratio), **zone_kwargs)
         except Exception:
             nifty_zones[tf] = None
     return nifty_zones, sources
@@ -148,7 +155,8 @@ def recompute_metrics_for_subset(trade_log: pd.DataFrame) -> dict:
 
 def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
                              risk_pct: float, initial_capital: float,
-                             data_dir: str = "data", ratio: dict = None) -> StrategyResults:
+                             data_dir: str = "data", ratio: dict = None,
+                             zone_params: dict = None) -> StrategyResults:
     """
     Real integration: loads OHLC (CSV-first/live-fallback/synthetic-last-resort)
     for both `ticker` and the Nifty benchmark, then calls your actual
@@ -158,11 +166,12 @@ def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
     figures; see charting.py for that.
     """
     ratio = ratio or default_ratio()
+    zone_params = zone_params or default_zone_params()
     ts_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     ticker_dfs, ticker_sources = _load_ticker_across_timeframes(ticker, start_date, end_date, data_dir)
 
-    nifty_zones, nifty_sources = _build_nifty_zone_dfs(start_date, end_date, data_dir, ratio)
+    nifty_zones, nifty_sources = _build_nifty_zone_dfs(start_date, end_date, data_dir, ratio, zone_params)
 
     data = {ticker: ticker_dfs}
 
@@ -171,6 +180,7 @@ def run_strategy_for_ticker(ticker: str, start_date: date, end_date: date,
             ticker, data, ratio,
             nifty_zones.get("1d"), nifty_zones.get("1wk"), nifty_zones.get("1mo"),
             C=initial_capital, risk=risk_pct,
+            zone_params=zone_params,
         )
     except Exception as e:
         return StrategyResults(

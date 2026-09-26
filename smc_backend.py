@@ -40,6 +40,7 @@ except ImportError:
     find_peaks = None
 import pandas as pd
 import numpy as np
+from zone_params_config import DEFAULT_ZONE_PARAMS as _ZONE_PARAM_DEFAULTS
 try:
     import requests  # unused by any function kept in this module
 except ImportError:
@@ -427,14 +428,14 @@ def compute_gap_flags(df: pd.DataFrame,gap_threshold=1.0) -> pd.Series:
     df['Gapped'] = gap_atr_multiple > gap_threshold
     return df
 
-def compute_volume_zscore(df: pd.DataFrame, lookback: int) -> pd.Series:
+def compute_volume_zscore(df: pd.DataFrame, lookback: int, zscore_threshold: float = 1.5) -> pd.Series:
     """Rolling z-score of volume -- flags abnormally thin/illiquid trading."""
     if 'Volume' not in df.columns:
         return pd.Series(np.nan, index=df.index)
     roll_mean = df['Volume'].rolling(lookback).mean()
     roll_std = df['Volume'].rolling(lookback).std().replace(0, np.nan)
     Volume_Zscore = (df['Volume'] - roll_mean) / roll_std
-    df['High_Volume'] = Volume_Zscore > 1.5
+    df['High_Volume'] = Volume_Zscore > zscore_threshold
 
     return df
 
@@ -591,19 +592,30 @@ def identify_zones(df, ratio):
 
     return df
 
-def identity_zones_with_multibase(df,ratio,max_base_candles=10):
+def identity_zones_with_multibase(df,ratio,max_base_candles=10,
+                                   atr_period=14,
+                                   gap_threshold=0.5,
+                                   vol_zscore_lookback=22,
+                                   vol_zscore_threshold=1.5,
+                                   choppiness_period=22,
+                                   choppiness_threshold=38.2,
+                                   swing_lookback=5,
+                                   structure_swing_lookback=22,
+                                   sweep_wick_ratio=3,
+                                   require_bos_for_order_block=0):
 
   """Calculates indicators and identifies potential DZone/SZone locations, including continuous zones."""
   df = calculate_true_range(df.copy()) # Adding TR
-  df = calculate_atr(df)               # Adding ATR
+  df = calculate_atr(df, period=atr_period)               # Adding ATR
   df = classify_candles(df,ratio)      # Adding Is_base, Is_Exciting, Is_Explosive to the Df
-  df = compute_gap_flags(df,gap_threshold=0.5)           # Adding Gap to the Df
-  df = compute_volume_zscore(df, lookback=22) # 1 month  # Adding High_Volume
-  df = compute_choppiness_index(df,period=22,chop_indx=38.2)  # Chopiness , Trending < 38.2 < AmbiguousTransitioning < 61.8 < ChopplySideways
-  df = detect_swing_points(df, lookback=5) # Adding Swing_High , Swing_Low
-  df = compute_bos_flags_n_liquidity_sweep(df, swing_lookback = 22,
-                                            sweep_wick_ratio= 3) # Adding BOS_Bull , BOS_Bear, Sweep_High, Sweep_Low # Unclear how BOS will work in Contnuous zones
-  df = detect_order_blocks(df,require_bos_for_order_block=0) # Adding Bullish_OB, Bearish_OB
+  df = compute_gap_flags(df,gap_threshold=gap_threshold)           # Adding Gap to the Df
+  df = compute_volume_zscore(df, lookback=vol_zscore_lookback,
+                              zscore_threshold=vol_zscore_threshold) # 1 month  # Adding High_Volume
+  df = compute_choppiness_index(df,period=choppiness_period,chop_indx=choppiness_threshold)  # Chopiness , Trending < choppiness_threshold < AmbiguousTransitioning < 61.8 < ChopplySideways
+  df = detect_swing_points(df, lookback=swing_lookback) # Adding Swing_High , Swing_Low
+  df = compute_bos_flags_n_liquidity_sweep(df, swing_lookback = structure_swing_lookback,
+                                            sweep_wick_ratio= sweep_wick_ratio) # Adding BOS_Bull , BOS_Bear, Sweep_High, Sweep_Low # Unclear how BOS will work in Contnuous zones
+  df = detect_order_blocks(df,require_bos_for_order_block=require_bos_for_order_block) # Adding Bullish_OB, Bearish_OB
 
   n                         = len(df)
   is_exc,is_base,is_exp     = df['Is_Exciting'],df['Is_Base'],df['Is_Explosive']
@@ -717,7 +729,8 @@ def check_refined_htf_support(daily_row, htf_df, creation_date):
 
     return False
 
-def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_df=None, nifty_1wk_df=None, nifty_1mo_df=None):
+def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_df=None, nifty_1wk_df=None, nifty_1mo_df=None,
+                           weekly_trend_window=52):
     """Calculates a score for each zone based on Freshness, Strength, Base Count, Weekly Trend, and HTF Support."""
     # Initialize columns
     # df_ts = df[df['Zone_Created'] == True].copy()
@@ -742,7 +755,7 @@ def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_d
 
     if weekly_df is not None and not weekly_df.empty:
       # weekly_df = determine_market_trend(weekly_df, fast_period = 20, slow_period = 50)
-      weekly_df = determine_market_trend(weekly_df, window=52)
+      weekly_df = determine_market_trend(weekly_df, window=weekly_trend_window)
 
     # Identify where zones were created (The Leg-out candle)
     zone_indices = np.where(df['Zone_Created'] == True)[0]
@@ -1048,16 +1061,23 @@ def run_risk_management_simulation(df_bt, initial_capital, risk_percentage_per_t
     return df_rm
 
 def run_strategy_for_ticker(ticker, data, ratio,
-                            nifty_1d_df=None,nifty_1wk_df=None,nifty_1mo_df=None,C=100000,risk=0.01):
+                            nifty_1d_df=None,nifty_1wk_df=None,nifty_1mo_df=None,C=100000,risk=0.01,
+                            zone_params=None):
     """Modular orchestrator for the backtest strategy."""
     #print(f"Processing: {ticker}")
     # df_with_zone = identify_zones(data[ticker]['1d'], ratio['GEN.NS']['1d'])
+    zp = dict(_ZONE_PARAM_DEFAULTS)
+    if zone_params:
+        zp.update(zone_params)
+
+    zone_kwargs = {k: v for k, v in zp.items() if k != "weekly_trend_window"}
+
     out = {'anal':{'ts':None,'bt':None,'rm':None},
             'zones':{'1d':None,'1wk':None,'1mo':None}}
 
-    df_with_zones_1d = identity_zones_with_multibase(data[ticker]['1d'], ratio['GEN.NS']['1d'])
-    df_with_zones_1wk = identity_zones_with_multibase(data[ticker]['1wk'], ratio['GEN.NS']['1wk'])
-    df_with_zones_1mo = identity_zones_with_multibase(data[ticker]['1mo'], ratio['GEN.NS']['1mo'])
+    df_with_zones_1d = identity_zones_with_multibase(data[ticker]['1d'], ratio['GEN.NS']['1d'], **zone_kwargs)
+    df_with_zones_1wk = identity_zones_with_multibase(data[ticker]['1wk'], ratio['GEN.NS']['1wk'], **zone_kwargs)
+    df_with_zones_1mo = identity_zones_with_multibase(data[ticker]['1mo'], ratio['GEN.NS']['1mo'], **zone_kwargs)
 
     if df_with_zones_1d.empty:
       print(f'No Zones found for {ticker}')
@@ -1066,7 +1086,8 @@ def run_strategy_for_ticker(ticker, data, ratio,
 
     df_ts,df_with_zones_1wk = calculate_trade_score(ticker,
                                                     df_with_zones_1d, df_with_zones_1wk, df_with_zones_1mo,
-                                                    nifty_1d_df, nifty_1wk_df, nifty_1mo_df)
+                                                    nifty_1d_df, nifty_1wk_df, nifty_1mo_df,
+                                                    weekly_trend_window=zp["weekly_trend_window"])
     out['anal']['ts'] = df_ts
 
     df_bt = backtest_zones(ticker, df_with_zones_1d)
