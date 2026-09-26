@@ -603,7 +603,8 @@ def identity_zones_with_multibase(df,ratio,max_base_candles=10,
                                    structure_swing_lookback=22,
                                    sweep_wick_ratio=3,
                                    require_bos_for_order_block=False,
-                                   wick2wick=False):
+                                   wick2wick=False,
+                                   distal_pct_from_zone=0.0):
 
   """Calculates indicators and identifies potential DZone/SZone locations, including continuous zones."""
   df = calculate_true_range(df.copy()) # Adding TR
@@ -680,6 +681,15 @@ def identity_zones_with_multibase(df,ratio,max_base_candles=10,
       proximal = base_bot.min()
       distal = highs[bs:be+2].max()
       # distal = highs[bs:be+1].max() if is_continuous else highs[bs:be + 2].max()
+
+    if distal_pct_from_zone > 0:
+        # zone_height = proximal - distal
+        if is_demand:
+            # distal = proximal - zone_height * (1 + distal_pct_from_zone)
+            distal = distal * (1 - distal_pct_from_zone/100.0)
+        else:
+            # distal = proximal + zone_height * (1 + distal_pct_from_zone)
+            distal = distal * (1 + distal_pct_from_zone/100.0)
 
     df.at[df.index[i], 'Is Demand'] = is_demand
     df.at[df.index[i], 'Is Continuous'] = is_continuous

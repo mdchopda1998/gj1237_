@@ -30,6 +30,7 @@ DEFAULT_ZONE_PARAMS = {
     "require_bos_for_order_block": False,
     "weekly_trend_window": 52,
     "wick2wick": False,
+    "distal_pct_from_zone": 0.0
 }
 
 # (key, label, help, min, max, step, kind)
@@ -88,6 +89,11 @@ PARAM_META = [
         "A wick beyond a swing level counts as a Liquidity Sweep only once "
         "the wick is at least this fraction of the candle's full range.",
         0.1, 5.0, 0.1, "slider_float",
+    ),
+    (
+        "distal_pct_from_zone", "Distal Percentage from Zone",
+        "The percentage by which the distal level should be from the zone.",
+        0.0, 2.0, 0.1, "slider_float",
     ),
     (
         "max_base_candles", "Max Base Candles",
