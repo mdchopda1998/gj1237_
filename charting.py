@@ -251,6 +251,21 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
         increasing_line_color=p["mbull"], increasing_fillcolor=p["mbull"],
         decreasing_line_color=p["mbear"], decreasing_fillcolor=p["mbear"],        
     )
+
+    # 1. Calculate EMAs if they don't already exist in zone_df
+    ema20 = zone_df["Close"].ewm(span=20, adjust=False).mean()
+    ema50 = zone_df["Close"].ewm(span=50, adjust=False).mean()    
+    # 3. Define EMA Traces
+    ema20_trace = go.Scatter(
+        x=zone_df.index, y=ema20, name="EMA 20",
+        line=dict(color="#FF9900", width=1.5), mode="lines"
+    )
+    
+    ema50_trace = go.Scatter(
+        x=zone_df.index, y=ema50, name="EMA 50",
+        line=dict(color="#3399FF", width=1.5), mode="lines"
+    )
+
     if has_volume:
         fig.add_trace(candle, row=1, col=1)
         vol_colors = ["rgba(22,163,74,0.55)" if c >= o else "rgba(229,72,77,0.55)"
@@ -382,6 +397,21 @@ def build_candle_marker_figure(zone_df: pd.DataFrame, ticker: str, timeframe_lab
         increasing_line_color=p["mbull"], increasing_fillcolor=p["mbull"],
         decreasing_line_color=p["mbear"], decreasing_fillcolor=p["mbear"],
     )
+
+    # 1. Calculate EMAs if they don't already exist in zone_df
+    ema20 = zone_df["Close"].ewm(span=20, adjust=False).mean()
+    ema50 = zone_df["Close"].ewm(span=50, adjust=False).mean()    
+    # 3. Define EMA Traces
+    ema20_trace = go.Scatter(
+        x=zone_df.index, y=ema20, name="EMA 20",
+        line=dict(color="#FF9900", width=1.5), mode="lines"
+    )
+    
+    ema50_trace = go.Scatter(
+        x=zone_df.index, y=ema50, name="EMA 50",
+        line=dict(color="#3399FF", width=1.5), mode="lines"
+    )
+
     if has_volume:
         fig.add_trace(candle, row=1, col=1)
         vol_colors = ["rgba(22,163,74,0.55)" if c >= o else "rgba(229,72,77,0.55)"
