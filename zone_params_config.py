@@ -29,6 +29,7 @@ DEFAULT_ZONE_PARAMS = {
     "max_base_candles": 10,
     "require_bos_for_order_block": False,
     "weekly_trend_window": 52,
+    "wick2wick": False,
 }
 
 # (key, label, help, min, max, step, kind)
@@ -100,6 +101,13 @@ PARAM_META = [
         "candle followed by an Explosive move. On: it also requires a "
         "confirmed Break of Structure.",
         None, None, None, "checkbox",
+    ),
+    (
+            "wick2wick", " Wick-to-Wick Marking",
+            "Off (default): It will mark body to wick. On: It will mark wick to wick. "
+            "This is useful for identifying order blocks that are formed by a"
+            " wick to wick move, which is often the case in volatile markets.",
+            None, None, None, "checkbox",
     ),
     (
         "weekly_trend_window", "Weekly Trend Window",

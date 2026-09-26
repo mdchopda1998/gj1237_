@@ -602,7 +602,8 @@ def identity_zones_with_multibase(df,ratio,max_base_candles=10,
                                    swing_lookback=5,
                                    structure_swing_lookback=22,
                                    sweep_wick_ratio=3,
-                                   require_bos_for_order_block=0):
+                                   require_bos_for_order_block=False,
+                                   wick2wick=False):
 
   """Calculates indicators and identifies potential DZone/SZone locations, including continuous zones."""
   df = calculate_true_range(df.copy()) # Adding TR
@@ -666,7 +667,10 @@ def identity_zones_with_multibase(df,ratio,max_base_candles=10,
 
     base_top = np.maximum(opens[bs:be+1],closes[bs:be+1])
     base_bot = np.minimum(opens[bs:be+1],closes[bs:be+1])
-    prox,dist = base_top.max(),base_bot.min()
+
+    if wick2wick:
+        base_top = highs[bs:be+1]
+        base_bot = lows[bs:be+1]
 
     if is_demand:
       proximal = base_top.max()
