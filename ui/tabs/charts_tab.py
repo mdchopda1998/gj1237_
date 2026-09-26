@@ -1,6 +1,7 @@
 import streamlit as st
 
-from charting import filter_zones, build_zone_figure, zones_display_table, chart_heading, TRIM_MODE_LABELS
+from charting import (filter_zones, build_zone_figure, build_candle_marker_figure,
+                      zones_display_table, chart_heading, TRIM_MODE_LABELS, CANDLE_FLAG_COLUMNS)
 from filter_state import get_active_filters, trade_score_bool_columns, bool_filter_key, outcome_options
 from ui.style import section_header, icon_span
 
@@ -10,6 +11,7 @@ SOURCE_NOTES = {
     "live": "Yahoo Finance (yfinance)",
     "synthetic": "synthetic placeholder - no CSV found and live fetch failed",
 }
+CANDLE_FLAG_LABELS = list(CANDLE_FLAG_COLUMNS.keys())
 
 
 def render(config: dict, results):
@@ -34,109 +36,134 @@ def render(config: dict, results):
         filter_box = st.container()
     with filter_box:
         st.markdown(f"##### {icon_span('filter_alt', size=16)} Chart Filters — instant, does *not* re-run analysis", unsafe_allow_html=True)
-        st.caption(
-            "These only change which zones are drawn below. Zone detection, the "
-            "backtest, and scoring stay exactly as they were at the timestamp "
-            "above until you click **Run Analysis** again in the sidebar. "
-            "The Metrics tab has a matching toggle to see numbers for just "
-            "this filtered subset. Use **Reset all filters** in the sidebar "
-            "to clear everything below."
-        )
 
-        f1, f2, f3 = st.columns([2, 2, 2])
-        with f1:
-            st.slider("Max Base Count", 1, 10, 10, key="max_base_count")
-        with f2:
+        plot_zone_mode = st.toggle(
+            "Plot Zone", value=True, key="plot_zone_mode",
+            help="On (default): draw the detected Demand/Supply zone rectangles, "
+                 "with all the filters below. Off: a plain candlestick chart with "
+                 "no zone rectangles - instead pick which candle-level patterns "
+                 "(Base, Exciting, Explosive, Gapped, High Volume, Trending, "
+                 "Swing Point, BOS, OB, Sweep) to mark on the chart.",
+        )
+        st.markdown("---")
+
+        if not plot_zone_mode:
+            st.caption(
+                "Plot Zone is off - showing a plain price chart. Pick any of the "
+                "candle-level patterns below to mark them on it; none selected "
+                "means just the candles/volume, no markers."
+            )
             if hasattr(st, "pills"):
-                st.pills("Zone Type", ["Demand", "Supply"], default=["Demand", "Supply"],
-                         selection_mode="multi", key="zone_types")
+                st.pills(
+                    "Pattern markers", CANDLE_FLAG_LABELS, default=[],
+                    selection_mode="multi", key="candle_flag_filters",
+                )
             else:
-                st.multiselect("Zone Type", ["Demand", "Supply"], default=["Demand", "Supply"], key="zone_types")
-        with f3:
-            # 'Is Continuous' lives on the zone dataframe itself, not just
-            # trade_score, so this filter works on all three timeframes.
-            if hasattr(st, "pills"):
-                st.pills("Pattern", ["Continuous", "Reversal"], default=["Continuous", "Reversal"],
-                         selection_mode="multi", key="pattern_types")
-            else:
-                st.multiselect("Pattern", ["Continuous", "Reversal"], default=["Continuous", "Reversal"],
-                                key="pattern_types")
+                st.multiselect(
+                    "Pattern markers", CANDLE_FLAG_LABELS, default=[],
+                    key="candle_flag_filters",
+                )
+            st.markdown("---")
+
+        if plot_zone_mode:
+            f1, f2, f3 = st.columns([2, 2, 2])
+            with f1:
+                st.slider("Max Base Count", 1, 10, 10, key="max_base_count")
+            with f2:
+                if hasattr(st, "pills"):
+                    st.pills("Zone Type", ["Demand", "Supply"], default=["Demand", "Supply"],
+                             selection_mode="multi", key="zone_types")
+                else:
+                    st.multiselect("Zone Type", ["Demand", "Supply"], default=["Demand", "Supply"], key="zone_types")
+            with f3:
+                # 'Is Continuous' lives on the zone dataframe itself, not just
+                # trade_score, so this filter works on all three timeframes.
+                if hasattr(st, "pills"):
+                    st.pills("Pattern", ["Continuous", "Reversal"], default=["Continuous", "Reversal"],
+                             selection_mode="multi", key="pattern_types")
+                else:
+                    st.multiselect("Pattern", ["Continuous", "Reversal"], default=["Continuous", "Reversal"],
+                                    key="pattern_types")
 
         st.toggle(
             "Show NIFTY 50 benchmark chart", value=True, key="show_nifty_chart",
-            help="Adds a NIFTY 50 zones chart below the selected stock's chart on "
+            help="Adds a NIFTY 50 chart below the selected stock's chart on "
                  "each Daily/Weekly/Monthly tab - the same index zone-identification "
                  "your backend already computes for the N_LTF/N_ITF/N_HTF Support "
-                 "confluence flags used in scoring, just rendered here too.",
+                 "confluence flags used in scoring, just rendered here too. Follows "
+                 "the Plot Zone toggle and pattern markers the same way the stock "
+                 "chart above does.",
         )
 
-        trim_options = list(TRIM_MODE_LABELS.values())
         trim_option_to_mode = {v: k for k, v in TRIM_MODE_LABELS.items()}
-        if hasattr(st, "pills"):
-            st.pills(
-                "Zone rectangle length", trim_options, default="Trim at exit date",
-                key="trim_mode_choice",
-                help="Full rectangle: every zone extends to the edge of the chart, no trimming. "
-                     "Trim at breach: stops at the first candle whose Close crosses Distal "
-                     "(price-based invalidation check - matches your backend's plot_stock_zones). "
-                     "Trim at exit date: stops at that zone's actual trade Exit Date from your "
-                     "real run_risk_management_simulation output (target hit, stop hit, or "
-                     "otherwise) - only zones that actually produced a trade have one.",
-            )
-        else:
-            st.radio(
-                "Zone rectangle length", trim_options, index=2,
-                key="trim_mode_choice", horizontal=True,
-            )
-
-        has_trade_score = results.trade_score is not None and not results.trade_score.empty
-        has_trade_log = results.trade_log is not None and not results.trade_log.empty
-        available_outcomes = outcome_options(results.trade_log)
-
-        if has_trade_score or available_outcomes:
-            bool_cols = trade_score_bool_columns(results.trade_score)
-            n_daily_filters = 2 + len(bool_cols) + (1 if available_outcomes else 0)
-            with st.expander(
-                f"Daily-only filters — every trade-score column ({n_daily_filters} total)",
-                expanded=False,
-            ):
-                st.caption(
-                    "All of these come from your real calculate_trade_score / "
-                    "run_risk_management_simulation output - only computed for the "
-                    "daily timeframe, so they have no effect on the Weekly/Monthly charts."
+        if plot_zone_mode:
+            trim_options = list(TRIM_MODE_LABELS.values())
+            if hasattr(st, "pills"):
+                st.pills(
+                    "Zone rectangle length", trim_options, default="Trim at exit date",
+                    key="trim_mode_choice",
+                    help="Full rectangle: every zone extends to the edge of the chart, no trimming. "
+                         "Trim at breach: stops at the first candle whose Close crosses Distal "
+                         "(price-based invalidation check - matches your backend's plot_stock_zones). "
+                         "Trim at exit date: stops at that zone's actual trade Exit Date from your "
+                         "real run_risk_management_simulation output (target hit, stop hit, or "
+                         "otherwise) - only zones that actually produced a trade have one.",
                 )
-                st.toggle("Filter by minimum Strength", value=False, key="use_strength",
-                          disabled=not has_trade_score)
-                if has_trade_score and st.session_state.get("use_strength"):
-                    max_strength = int(results.trade_score["Strength"].max())
-                    st.slider("Min Strength", 0, max(max_strength, 1), 0, key="min_strength")
-                st.toggle("Fresh zones only", value=False, key="fresh_only", disabled=not has_trade_score)
+            else:
+                st.radio(
+                    "Zone rectangle length", trim_options, index=2,
+                    key="trim_mode_choice", horizontal=True,
+                )
 
-                if available_outcomes:
-                    st.markdown("**Trade outcome** (zones whose resulting trade matches):")
-                    if hasattr(st, "pills"):
-                        st.pills("Outcome", available_outcomes, default=available_outcomes,
-                                 selection_mode="multi", key="outcome_types")
-                    else:
-                        st.multiselect("Outcome", available_outcomes, default=available_outcomes,
-                                       key="outcome_types")
+            has_trade_score = results.trade_score is not None and not results.trade_score.empty
+            has_trade_log = results.trade_log is not None and not results.trade_log.empty
+            available_outcomes = outcome_options(results.trade_log)
+
+            if has_trade_score or available_outcomes:
+                bool_cols = trade_score_bool_columns(results.trade_score)
+                n_daily_filters = 2 + len(bool_cols) + (1 if available_outcomes else 0)
+                with st.expander(
+                    f"Daily-only filters — every trade-score column ({n_daily_filters} total)",
+                    expanded=False,
+                ):
                     st.caption(
-                        "Only affects zones that actually triggered a trade - zones "
-                        "never entered have no outcome to match, so they're excluded "
-                        "whenever this filter narrows the selection below 'all'."
+                        "All of these come from your real calculate_trade_score / "
+                        "run_risk_management_simulation output - only computed for the "
+                        "daily timeframe, so they have no effect on the Weekly/Monthly charts."
                     )
+                    st.toggle("Filter by minimum Strength", value=False, key="use_strength",
+                              disabled=not has_trade_score)
+                    if has_trade_score and st.session_state.get("use_strength"):
+                        max_strength = int(results.trade_score["Strength"].max())
+                        st.slider("Min Strength", 0, max(max_strength, 1), 0, key="min_strength")
+                    st.toggle("Fresh zones only", value=False, key="fresh_only", disabled=not has_trade_score)
 
-                if bool_cols:
-                    st.markdown("**Score flags** (zone must be True for each one enabled):")
-                    n_per_row = 3
-                    for i in range(0, len(bool_cols), n_per_row):
-                        row_cols = st.columns(n_per_row)
-                        for col_widget, ts_col in zip(row_cols, bool_cols[i:i + n_per_row]):
-                            with col_widget:
-                                st.toggle(ts_col, value=False, key=bool_filter_key(ts_col))
+                    if available_outcomes:
+                        st.markdown("**Trade outcome** (zones whose resulting trade matches):")
+                        if hasattr(st, "pills"):
+                            st.pills("Outcome", available_outcomes, default=available_outcomes,
+                                     selection_mode="multi", key="outcome_types")
+                        else:
+                            st.multiselect("Outcome", available_outcomes, default=available_outcomes,
+                                           key="outcome_types")
+                        st.caption(
+                            "Only affects zones that actually triggered a trade - zones "
+                            "never entered have no outcome to match, so they're excluded "
+                            "whenever this filter narrows the selection below 'all'."
+                        )
+
+                    if bool_cols:
+                        st.markdown("**Score flags** (zone must be True for each one enabled):")
+                        n_per_row = 3
+                        for i in range(0, len(bool_cols), n_per_row):
+                            row_cols = st.columns(n_per_row)
+                            for col_widget, ts_col in zip(row_cols, bool_cols[i:i + n_per_row]):
+                                with col_widget:
+                                    st.toggle(ts_col, value=False, key=bool_filter_key(ts_col))
     # --- end Chart Filters --------------------------------------------------
 
-    active = get_active_filters(results)
+    active = get_active_filters(results) if plot_zone_mode else None
+    selected_flags = st.session_state.get("candle_flag_filters") or []
 
     tf_tabs = st.tabs(list(TF_LABELS.values()))
     for (tf_key, tf_label), tf_tab in zip(TF_LABELS.items(), tf_tabs):
@@ -155,31 +182,53 @@ def render(config: dict, results):
 
             trim_mode = trim_option_to_mode.get(st.session_state.get("trim_mode_choice"), "exit")
 
-            filtered = filter_zones(
-                zone_df,
-                max_base_count=active["max_base_count"],
-                zone_types=active["zone_types"],
-                pattern_types=active["pattern_types"],
-                trade_score=score_df,
-                min_strength=active["min_strength"] if is_daily else None,
-                fresh_only=active["fresh_only"] if is_daily else False,
-                bool_filters=active["bool_filters"] if is_daily else None,
-                trade_log=log_df,
-                outcome_types=active["outcome_types"] if is_daily else None,
-            )
-            fig = build_zone_figure(zone_df, config["ticker"], tf_label,
-                                     filtered_zones=filtered, trade_score=score_df,
-                                     trim_mode=trim_mode, trade_log=log_df)
-            chart_heading(config["ticker"], tf_label, len(filtered))
-            st.plotly_chart(fig, use_container_width=True, key=f"zone_chart_{tf_key}")
+            if plot_zone_mode:
+                filtered = filter_zones(
+                    zone_df,
+                    max_base_count=active["max_base_count"],
+                    zone_types=active["zone_types"],
+                    pattern_types=active["pattern_types"],
+                    trade_score=score_df,
+                    min_strength=active["min_strength"] if is_daily else None,
+                    fresh_only=active["fresh_only"] if is_daily else False,
+                    bool_filters=active["bool_filters"] if is_daily else None,
+                    trade_log=log_df,
+                    outcome_types=active["outcome_types"] if is_daily else None,
+                )
+                fig = build_zone_figure(zone_df, config["ticker"], tf_label,
+                                         filtered_zones=filtered, trade_score=score_df,
+                                         trim_mode=trim_mode, trade_log=log_df)
+                chart_heading(config["ticker"], tf_label, len(filtered))
+                st.plotly_chart(fig, use_container_width=True, key=f"zone_chart_{tf_key}")
 
-            total_zones = int(zone_df["Zone_Created"].sum()) if "Zone_Created" in zone_df.columns else 0
-            source = results.data_sources.get(tf_key, "unknown")
-            source_note = SOURCE_NOTES.get(source, source)
-            st.caption(
-                f"{len(filtered)} of {total_zones} zone(s) shown after filters "
-                f"\u00b7 Data source: {source_note}"
-            )
+                total_zones = int(zone_df["Zone_Created"].sum()) if "Zone_Created" in zone_df.columns else 0
+                source = results.data_sources.get(tf_key, "unknown")
+                source_note = SOURCE_NOTES.get(source, source)
+                st.caption(
+                    f"{len(filtered)} of {total_zones} zone(s) shown after filters "
+                    f"\u00b7 Data source: {source_note}"
+                )
+            else:
+                # Plot Zone off: plain candlestick + volume, no zone
+                # rectangles - just markers for whichever candle-level
+                # patterns are selected above (works on every timeframe,
+                # these columns aren't daily-only).
+                fig = build_candle_marker_figure(zone_df, config["ticker"], tf_label,
+                                                  selected_flags=selected_flags)
+                n_marked = 0
+                for lbl in selected_flags:
+                    for col, _ in CANDLE_FLAG_COLUMNS.get(lbl, []):
+                        if col in zone_df.columns:
+                            n_marked += int(zone_df[col].sum())
+                chart_heading(config["ticker"], tf_label, n_marked)
+                st.plotly_chart(fig, use_container_width=True, key=f"plain_chart_{tf_key}")
+
+                source = results.data_sources.get(tf_key, "unknown")
+                source_note = SOURCE_NOTES.get(source, source)
+                if selected_flags:
+                    st.caption(f"{n_marked} marker(s) shown \u00b7 Data source: {source_note}")
+                else:
+                    st.caption(f"No pattern markers selected \u00b7 Data source: {source_note}")
 
             if st.session_state.get("show_nifty_chart", True):
                 nifty_zones_by_tf = getattr(results, "nifty_zones", None) or {}
@@ -187,7 +236,7 @@ def render(config: dict, results):
                 st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
                 if nifty_df is None or nifty_df.empty:
                     st.info(f"NIFTY 50 {tf_label.lower()} benchmark data not available for this run.")
-                else:
+                elif plot_zone_mode:
                     # Same Base Count / Zone Type / Pattern filters as the stock
                     # chart above, applied to NIFTY 50's own zones - NIFTY isn't
                     # scored/backtested (no trade_score/trade_log of its own),
@@ -213,37 +262,53 @@ def render(config: dict, results):
                         f"{len(nifty_filtered)} of {nifty_total} NIFTY 50 zone(s) shown after filters "
                         f"\u00b7 Data source: {nifty_source_note}"
                     )
-
-            with st.expander(f"View {len(filtered)} filtered zone(s) as a table", expanded=False):
-                table = zones_display_table(filtered, trade_score=score_df, zone_df=zone_df,
-                                             trade_log=log_df, trim_mode=trim_mode)
-                if table.empty:
-                    st.caption("No zones match the current filters.")
                 else:
-                    # Most useful columns first (matches a curated scanner-results
-                    # look) - nothing is hidden, any remaining detail columns
-                    # (individual boolean flags, raw Zone Created date, etc.)
-                    # still follow after, so the table stays scrollable-complete.
-                    preferred_order = ["Type", "Pattern", "Price Range", "Base Count", "Strength",
-                                        "Status", "Flags", "Zone Created", "Base Start Date",
-                                        "Exit/Breach Date", "Proximal", "Distal", "Target"]
-                    ordered_cols = [c for c in preferred_order if c in table.columns]
-                    ordered_cols += [c for c in table.columns if c not in ordered_cols]
-                    table = table[ordered_cols]
+                    nifty_fig = build_candle_marker_figure(nifty_df, "NIFTY 50", tf_label,
+                                                            selected_flags=selected_flags)
+                    nifty_n_marked = 0
+                    for lbl in selected_flags:
+                        for col, _ in CANDLE_FLAG_COLUMNS.get(lbl, []):
+                            if col in nifty_df.columns:
+                                nifty_n_marked += int(nifty_df[col].sum())
+                    chart_heading("NIFTY 50", tf_label, nifty_n_marked)
+                    st.plotly_chart(nifty_fig, use_container_width=True, key=f"nifty_plain_chart_{tf_key}")
 
-                    column_config = {
-                        "Proximal": st.column_config.NumberColumn(format="₹%.2f"),
-                        "Distal": st.column_config.NumberColumn(format="₹%.2f"),
-                        "Target": st.column_config.NumberColumn(format="₹%.2f"),
-                        "Zone Created": st.column_config.DateColumn(format="YYYY-MM-DD"),
-                        "Base Start Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
-                        "Exit/Breach Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
-                    }
-                    st.dataframe(table, use_container_width=True, hide_index=True,
-                                 column_config=column_config)
-                    st.download_button(
-                        f"Download {tf_label.lower()} zones as CSV",
-                        table.to_csv(index=False).encode("utf-8"),
-                        file_name=f"{config['ticker']}_{tf_key}_zones.csv",
-                        mime="text/csv", key=f"download_zones_{tf_key}", icon=":material/download:",
-                    )
+                    nifty_sources = getattr(results, "nifty_data_sources", None) or {}
+                    nifty_source = nifty_sources.get(tf_key, "unknown")
+                    nifty_source_note = SOURCE_NOTES.get(nifty_source, nifty_source)
+                    st.caption(f"Data source: {nifty_source_note}")
+
+            if plot_zone_mode:
+                with st.expander(f"View {len(filtered)} filtered zone(s) as a table", expanded=False):
+                    table = zones_display_table(filtered, trade_score=score_df, zone_df=zone_df,
+                                                 trade_log=log_df, trim_mode=trim_mode)
+                    if table.empty:
+                        st.caption("No zones match the current filters.")
+                    else:
+                        # Most useful columns first (matches a curated scanner-results
+                        # look) - nothing is hidden, any remaining detail columns
+                        # (individual boolean flags, raw Zone Created date, etc.)
+                        # still follow after, so the table stays scrollable-complete.
+                        preferred_order = ["Type", "Pattern", "Price Range", "Base Count", "Strength",
+                                            "Status", "Flags", "Zone Created", "Base Start Date",
+                                            "Exit/Breach Date", "Proximal", "Distal", "Target"]
+                        ordered_cols = [c for c in preferred_order if c in table.columns]
+                        ordered_cols += [c for c in table.columns if c not in ordered_cols]
+                        table = table[ordered_cols]
+
+                        column_config = {
+                            "Proximal": st.column_config.NumberColumn(format="₹%.2f"),
+                            "Distal": st.column_config.NumberColumn(format="₹%.2f"),
+                            "Target": st.column_config.NumberColumn(format="₹%.2f"),
+                            "Zone Created": st.column_config.DateColumn(format="YYYY-MM-DD"),
+                            "Base Start Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
+                            "Exit/Breach Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
+                        }
+                        st.dataframe(table, use_container_width=True, hide_index=True,
+                                     column_config=column_config)
+                        st.download_button(
+                            f"Download {tf_label.lower()} zones as CSV",
+                            table.to_csv(index=False).encode("utf-8"),
+                            file_name=f"{config['ticker']}_{tf_key}_zones.csv",
+                            mime="text/csv", key=f"download_zones_{tf_key}", icon=":material/download:",
+                        )

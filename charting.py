@@ -316,6 +316,132 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
     return fig
 
 
+# --- Plain candle chart (Plot Zone = Off) -----------------------------
+# Maps each Chart Filter label to the real per-candle boolean column(s)
+# your backend's identify_zones/identity_zones_with_multibase already
+# computes on every row of zone_df (not just Zone_Created rows) - so
+# these work on every timeframe, no trade_score/trade_log needed.
+# Each entry is a list of (column_name, marker_style) pairs; a single
+# non-directional flag has one pair, a bull/bear-style flag has two
+# (drawn as distinct triangle-up/triangle-down markers so both variants
+# stay visually identifiable under one filter label).
+CANDLE_FLAG_COLUMNS = {
+    "Base":         [("Is_Base", "flat")],
+    "Exciting":     [("Is_Exciting", "flat")],
+    "Explosive":    [("Is_Explosive", "flat")],
+    "Gapped":       [("Gapped", "flat")],
+    "High Volume":  [("High_Volume", "flat")],
+    "Trending":     [("Trending", "flat")],
+    "Swing Point":  [("Swing_High", "high"), ("Swing_Low", "low")],
+    "BOS":          [("BOS_Bull", "high"), ("BOS_Bear", "low")],
+    "OB":           [("Bullish_OB", "high"), ("Bearish_OB", "low")],
+    "Sweep":        [("Sweep_High", "high"), ("Sweep_Low", "low")],
+}
+
+# One base color per filter label - bull/bear variants of the same label
+# reuse it (triangle direction + above/below placement already tells
+# those two apart), so the legend/color story stays simple at 10 labels.
+_FLAG_COLORS = {
+    "Base": "#8A93A6",
+    "Exciting": "#F59E0B",
+    "Explosive": "#E5484D",
+    "Gapped": "#7C3AED",
+    "High Volume": "#0EA5E9",
+    "Trending": "#16A34A",
+    "Swing Point": "#0F1729",
+    "BOS": "#3861FB",
+    "OB": "#00C896",
+    "Sweep": "#E69F00",
+}
+
+
+def build_candle_marker_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
+                                selected_flags=None, show_volume: bool = True) -> go.Figure:
+    """
+    Plain candlestick (+ optional volume) chart - no zone rectangles at
+    all. `selected_flags` is an iterable of CANDLE_FLAG_COLUMNS keys
+    ("Base", "Exciting", "Explosive", "Gapped", "High Volume", "Trending",
+    "Swing Point", "BOS", "OB", "Sweep"); every candle where the
+    corresponding real backend column is True gets a small marker (OR
+    across selected flags - a candle can carry more than one marker).
+    Selecting nothing just shows the plain chart.
+    """
+    from plotly.subplots import make_subplots
+
+    p = PALETTE
+    has_volume = show_volume and "Volume" in zone_df.columns
+    if has_volume:
+        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.78, 0.22],
+                             vertical_spacing=0.03)
+    else:
+        fig = go.Figure()
+
+    candle = go.Candlestick(
+        x=zone_df.index, open=zone_df["Open"], high=zone_df["High"],
+        low=zone_df["Low"], close=zone_df["Close"], name=ticker,
+        increasing_line_color=p["mbull"], increasing_fillcolor=p["mbull"],
+        decreasing_line_color=p["mbear"], decreasing_fillcolor=p["mbear"],
+    )
+    if has_volume:
+        fig.add_trace(candle, row=1, col=1)
+        vol_colors = ["rgba(22,163,74,0.55)" if c >= o else "rgba(229,72,77,0.55)"
+                      for o, c in zip(zone_df["Open"], zone_df["Close"])]
+        fig.add_trace(go.Bar(x=zone_df.index, y=zone_df["Volume"], marker_color=vol_colors,
+                              name="Volume", showlegend=False), row=2, col=1)
+        fig.update_yaxes(title_text="VOL", row=2, col=1, title_font=dict(size=10, color=p["text_muted"]))
+    else:
+        fig.add_trace(candle)
+
+    # Small, price-scale-aware offset so markers sit just clear of the
+    # wick rather than overlapping it, regardless of the ticker's price.
+    span = (zone_df["High"] - zone_df["Low"])
+    offset = span[span > 0].median()
+    if not pd.notna(offset) or offset == 0:
+        offset = zone_df["Close"].median() * 0.01
+    shape_kwargs = dict(row=1, col=1) if has_volume else {}
+
+    for label in (selected_flags or []):
+        pairs = CANDLE_FLAG_COLUMNS.get(label)
+        if not pairs:
+            continue
+        color = _FLAG_COLORS.get(label, p["brand"])
+        for col, style in pairs:
+            if col not in zone_df.columns:
+                continue
+            mask = zone_df[col] == True  # noqa: E712
+            if not mask.any():
+                continue
+            rows = zone_df[mask]
+            if style == "high":
+                y = rows["High"] + offset
+                symbol = "triangle-up"
+                name = f"{label} \u25b2"
+            elif style == "low":
+                y = rows["Low"] - offset
+                symbol = "triangle-down"
+                name = f"{label} \u25bc"
+            else:
+                y = rows["Low"] - offset
+                symbol = "circle"
+                name = label
+            fig.add_trace(
+                go.Scatter(
+                    x=rows.index, y=y, mode="markers", name=name,
+                    marker=dict(symbol=symbol, size=8, color=color,
+                                line=dict(width=1, color="rgba(255,255,255,0.9)")),
+                ),
+                **shape_kwargs,
+            )
+
+    _theme_layout(
+        fig,
+        xaxis_rangeslider_visible=False, height=560 if has_volume else 520,
+        showlegend=bool(selected_flags),
+        legend=dict(bgcolor="rgba(0,0,0,0)", orientation="h", y=-0.12),
+    )
+    return fig
+
+
 def chart_heading(ticker: str, timeframe_label: str, n_zones: int):
     """
     A card-style heading above the chart - ticker/timeframe + a zone-count
