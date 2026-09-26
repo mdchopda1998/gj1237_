@@ -91,11 +91,6 @@ PARAM_META = [
         0.1, 5.0, 0.1, "slider_float",
     ),
     (
-        "distal_pct_from_zone", "Distal Percentage from Zone",
-        "The percentage by which the distal level should be from the zone.",
-        0.0, 2.0, 0.1, "slider_float",
-    ),
-    (
         "max_base_candles", "Max Base Candles",
         "Longest run of consecutive 'Base' candles allowed between the "
         "leg-in and leg-out candles of a zone.",
@@ -115,6 +110,11 @@ PARAM_META = [
             " wick to wick move, which is often the case in volatile markets.",
             None, None, None, "checkbox",
     ),
+    (
+        "distal_pct_from_zone", "Distal Percentage from Zone",
+        "The percentage by which the distal level should be from the zone.",
+        0.0, 2.0, 0.1, "slider_float",
+    ),    
     (
         "weekly_trend_window", "Weekly Trend Window",
         "Bars used for the weekly market-trend/regime classification that "
