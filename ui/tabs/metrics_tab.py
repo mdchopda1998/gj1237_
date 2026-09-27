@@ -92,7 +92,7 @@ def _equity_curve(trade_log) -> go.Figure:
 def _render_metric_cards(m: dict, trade_log=None, initial_capital=None):
     left, right = st.columns([1, 2])
     with left:
-        st.plotly_chart(_composite_gauge(m.get("Composite Score")), use_container_width=True, key="composite_gauge_chart")
+        st.plotly_chart(_composite_gauge(m.get("Composite Score")), width="stretch", key="composite_gauge_chart")
         st.markdown(
             f'<div style="text-align:center;margin-top:-0.5rem;">{_edge_badge(m.get("Composite Score"))}</div>',
             unsafe_allow_html=True,
@@ -152,7 +152,7 @@ def _render_metric_cards(m: dict, trade_log=None, initial_capital=None):
         ])
 
     if trade_log is not None and not trade_log.empty and "Exit Date" in trade_log.columns:
-        st.plotly_chart(_equity_curve(trade_log), use_container_width=True, key="equity_curve_chart")
+        st.plotly_chart(_equity_curve(trade_log), width="stretch", key="equity_curve_chart")
 
     with st.expander("Timing, fill-quality & scaled expectancy detail"):
         st.write(
@@ -238,7 +238,7 @@ def render(config: dict, results):
 
     if not use_filtered:
         _render_metric_cards(m, trade_log=results.trade_log, initial_capital=config.get('initial_capital'))
-        st.dataframe(_style_trade_log(results.trade_bt), use_container_width=True, hide_index=True)
+        st.dataframe(_style_trade_log(results.trade_bt), width="stretch", hide_index=True)
         return
 
     # Mirror the exact same filter state the Charts tab set in session_state -

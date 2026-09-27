@@ -102,14 +102,15 @@ def _build_nifty_zone_dfs(start_date, end_date, data_dir: str, ratio: dict, zone
     zp = default_zone_params()
     if zone_params:
         zp.update(zone_params)
-    zone_kwargs = {k: v for k, v in zp.items() if k != "weekly_trend_window"}
+    # zone_kwargs = {k: v for k, v in zp.items() if k != "weekly_trend_window"}
+    zone_kwargs = {k: v for k, v in zp.items() if not k.startswith("trend_window")}
 
     dfs, sources = _load_ticker_across_timeframes(NIFTY_TICKER, start_date, end_date, data_dir)
     nifty_zones = {}
     for tf in TIMEFRAMES:
         try:
             nifty_zones[tf] = be.identity_zones_with_multibase(
-                dfs[tf].copy(), resolve_gen_ratio(tf, ratio), **zone_kwargs)
+                dfs[tf].copy(), resolve_gen_ratio(tf, ratio), zp[f'trend_window_{tf}'], **zone_kwargs)
         except Exception:
             nifty_zones[tf] = None
     return nifty_zones, sources

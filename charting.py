@@ -251,20 +251,18 @@ def build_zone_figure(zone_df: pd.DataFrame, ticker: str, timeframe_label: str,
         increasing_line_color=p["mbull"], increasing_fillcolor=p["mbull"],
         decreasing_line_color=p["mbear"], decreasing_fillcolor=p["mbear"],        
     )
-
-    # 1. Calculate EMAs if they don't already exist in zone_df
-    ema20 = zone_df["Close"].ewm(span=20, adjust=False).mean()
-    ema50 = zone_df["Close"].ewm(span=50, adjust=False).mean()    
-    # 3. Define EMA Traces
+  
     ema20_trace = go.Scatter(
-        x=zone_df.index, y=ema20, name="EMA 20",
+        x=zone_df.index, y=zone_df['EMA20'], name="EMA 20",
         line=dict(color="#FF9900", width=1.5), mode="lines"
     )
-    
     ema50_trace = go.Scatter(
-        x=zone_df.index, y=ema50, name="EMA 50",
+        x=zone_df.index, y=zone_df['EMA50'], name="EMA 50",
         line=dict(color="#3399FF", width=1.5), mode="lines"
     )
+
+    fig.add_trace(ema20_trace, row=1, col=1)
+    fig.add_trace(ema50_trace, row=1, col=1)
 
     if has_volume:
         fig.add_trace(candle, row=1, col=1)
@@ -351,6 +349,7 @@ CANDLE_FLAG_COLUMNS = {
     "BOS":          [("BOS_Bull", "high"), ("BOS_Bear", "low")],
     "OB":           [("Bullish_OB", "high"), ("Bearish_OB", "low")],
     "Sweep":        [("Sweep_High", "high"), ("Sweep_Low", "low")],
+    "Trend":        [],
 }
 
 # One base color per filter label - bull/bear variants of the same label
@@ -398,19 +397,17 @@ def build_candle_marker_figure(zone_df: pd.DataFrame, ticker: str, timeframe_lab
         decreasing_line_color=p["mbear"], decreasing_fillcolor=p["mbear"],
     )
 
-    # 1. Calculate EMAs if they don't already exist in zone_df
-    ema20 = zone_df["Close"].ewm(span=20, adjust=False).mean()
-    ema50 = zone_df["Close"].ewm(span=50, adjust=False).mean()    
-    # 3. Define EMA Traces
     ema20_trace = go.Scatter(
-        x=zone_df.index, y=ema20, name="EMA 20",
+        x=zone_df.index, y=zone_df['EMA20'], name="EMA 20",
         line=dict(color="#FF9900", width=1.5), mode="lines"
     )
-    
     ema50_trace = go.Scatter(
-        x=zone_df.index, y=ema50, name="EMA 50",
+        x=zone_df.index, y=zone_df['EMA50'], name="EMA 50",
         line=dict(color="#3399FF", width=1.5), mode="lines"
     )
+
+    fig.add_trace(ema20_trace, row=1, col=1)
+    fig.add_trace(ema50_trace, row=1, col=1)
 
     if has_volume:
         fig.add_trace(candle, row=1, col=1)
@@ -421,6 +418,27 @@ def build_candle_marker_figure(zone_df: pd.DataFrame, ticker: str, timeframe_lab
         fig.update_yaxes(title_text="VOL", row=2, col=1, title_font=dict(size=10, color=p["text_muted"]))
     else:
         fig.add_trace(candle)
+
+
+    if "Trend" in selected_flags and "Trend" in zone_df.columns:
+        # Suggest better color for trend markers: yellow for uptrend, red for downtrend, blue for sideways.
+        trend_aligned = zone_df['Trend']
+        up_indices = trend_aligned.index[trend_aligned == 1]
+        fig.add_trace(go.Scatter(x=up_indices, y=zone_df.loc[up_indices, 'High'] * 1.005,
+                                  mode='markers', marker=dict(symbol='triangle-up', color='blue', size=6),
+                                name = 'Up Trend'))
+
+        down_indices = trend_aligned.index[trend_aligned == -1]
+        fig.add_trace(go.Scatter(x=down_indices, y=zone_df.loc[down_indices, 'Low'] * 0.995,
+                                  mode='markers', marker=dict(symbol='triangle-down', color='Red', size=6),
+                                name = 'Down Trend'))
+
+        side_indices = trend_aligned.index[trend_aligned == 0]
+        fig.add_trace(go.Scatter(x=side_indices, y=zone_df.loc[side_indices, ['Open','Close']].mean(axis=1) * 1,
+                                  mode='markers', marker=dict(symbol='square', color='yellow', size=6),
+                                  name = 'Side Trend'))
+
+
 
     # Small, price-scale-aware offset so markers sit just clear of the
     # wick rather than overlapping it, regardless of the ticker's price.

@@ -130,7 +130,7 @@ def render(config: dict, results):
             st.caption("Win rate (bars) and avg P&L (line) by strength bucket")
             strength_breakdown = numeric_breakdown(merged, "Strength")
             if not strength_breakdown.empty:
-                st.plotly_chart(_breakdown_chart(strength_breakdown, "Strength"), use_container_width=True, key="strength_breakdown_chart")
+                st.plotly_chart(_breakdown_chart(strength_breakdown, "Strength"), width="stretch", key="strength_breakdown_chart")
             else:
                 st.caption("No Strength data to show.")
     with n2:
@@ -139,7 +139,7 @@ def render(config: dict, results):
             st.caption("Win rate and avg P&L by number of base candles in zone")
             basecount_breakdown = numeric_breakdown(merged, "Base Count")
             if not basecount_breakdown.empty:
-                st.plotly_chart(_breakdown_chart(basecount_breakdown, "Base Count"), use_container_width=True, key="basecount_breakdown_chart")
+                st.plotly_chart(_breakdown_chart(basecount_breakdown, "Base Count"), width="stretch", key="basecount_breakdown_chart")
             else:
                 st.caption("No Base Count data to show.")
 
@@ -161,7 +161,7 @@ def render(config: dict, results):
             st.markdown(_flag_impact_list(summary, baseline_win_rate), unsafe_allow_html=True)
 
         with st.expander("Chart view + full comparison table", expanded=False):
-            st.plotly_chart(_tornado_chart(summary), use_container_width=True, key="tornado_chart")
+            st.plotly_chart(_tornado_chart(summary), width="stretch", key="tornado_chart")
 
             column_config = {
                 "Win Rate (True)": st.column_config.NumberColumn(format="%.1f%%"),
@@ -170,7 +170,7 @@ def render(config: dict, results):
                 "Avg PnL (False)": st.column_config.NumberColumn(format="₹%.2f"),
                 "Win Rate Delta": st.column_config.NumberColumn(format="%.1f pts"),
             }
-            st.dataframe(summary, use_container_width=True, hide_index=True, column_config=column_config)
+            st.dataframe(summary, width="stretch", hide_index=True, column_config=column_config)
             st.download_button(
                 "Download flag comparison as CSV",
                 summary.to_csv(index=False).encode("utf-8"),
