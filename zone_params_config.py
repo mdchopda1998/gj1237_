@@ -28,9 +28,11 @@ DEFAULT_ZONE_PARAMS = {
     "sweep_wick_ratio": 3.0,
     "max_base_candles": 10,
     "require_bos_for_order_block": False,
-    "weekly_trend_window": 52,
     "wick2wick": False,
-    "distal_pct_from_zone": 0.0
+    "distal_pct_from_zone": 0.0,
+    "trend_window_1d": 52,
+    "trend_window_1wk": 52,
+    "trend_window_1mo": 52,
 }
 
 # (key, label, help, min, max, step, kind)
@@ -115,9 +117,27 @@ PARAM_META = [
         "The percentage by which the distal level should be from the zone.",
         0.0, 2.0, 0.1, "slider_float",
     ),    
+    # (
+    #     "weekly_trend_window", "Weekly Trend Window",
+    #     "Bars used for the weekly market-trend/regime classification that "
+    #     "feeds Trend Support and ITF Support scoring.",
+    #     10, 200, 1, "slider_int",
+    # ),
     (
-        "weekly_trend_window", "Weekly Trend Window",
+        "trend_window_1d", "Daily Trend Window",
+        "Bars used for the daily market-trend/regime classification that "
+        "feeds Trend Support and ITF Support scoring.",
+        10, 200, 1, "slider_int",
+    ),
+    (
+        "trend_window_1wk", "Weekly Trend Window",
         "Bars used for the weekly market-trend/regime classification that "
+        "feeds Trend Support and ITF Support scoring.",
+        10, 200, 1, "slider_int",
+    ),
+    (
+        "trend_window_1mo", "Monthly Trend Window",
+        "Bars used for the monthly market-trend/regime classification that "
         "feeds Trend Support and ITF Support scoring.",
         10, 200, 1, "slider_int",
     ),

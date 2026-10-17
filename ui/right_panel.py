@@ -25,7 +25,7 @@ def render_right_panel() -> dict:
     st.caption("Hard-coded zone-detection & scoring constants - edit and re-run.")
 
     with st.container(border=True):
-        if st.button("Reset to defaults", icon=":material/restart_alt:", use_container_width=True):
+        if st.button("Reset to defaults", icon=":material/restart_alt:", width="stretch"):
             for key, *_ in PARAM_META:
                 st.session_state[_session_key(key)] = DEFAULT_ZONE_PARAMS[key]
             st.rerun()
@@ -68,7 +68,7 @@ def render_right_panel() -> dict:
 #         st.caption("Hard-coded zone-detection & scoring constants - edit and re-run.")
 
 #         with st.container(border=True):
-#             if st.button("Reset to defaults", icon=":material/restart_alt:", use_container_width=True):
+#             if st.button("Reset to defaults", icon=":material/restart_alt:", width="stretch"):
 #                 for key, *_ in PARAM_META:
 #                     st.session_state[_session_key(key)] = DEFAULT_ZONE_PARAMS[key]
 #                 st.rerun()

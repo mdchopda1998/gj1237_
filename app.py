@@ -60,7 +60,7 @@ def main():
 
     config = render_sidebar()
     run_clicked = st.sidebar.button("Run Analysis", type="primary", icon=":material/play_arrow:",
-                                     use_container_width=True)
+                                     width="stretch")
 
     # Main content (left) + Strategy Parameters control panel (right). The
     # panel must render, and its values land in config["zone_params"],

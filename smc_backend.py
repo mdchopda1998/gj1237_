@@ -405,6 +405,12 @@ def calculate_atr(df, period=14):
     df['ATR'] = df['TR'].ewm(span=period, adjust=False).mean()
     return df
 
+def compute_ema20_50(df):
+    """Calculates the 20-period and 50-period Exponential Moving Averages (EMA) for a given DataFrame."""
+    df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
+    df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
+    return df
+
 def classify_candles(df,ratio):
     tr = df['TR']
     atr = df['ATR']
@@ -592,7 +598,8 @@ def identify_zones(df, ratio):
 
     return df
 
-def identity_zones_with_multibase(df,ratio,max_base_candles=10,
+def identity_zones_with_multibase(df,ratio,trend_window=52,
+                                   max_base_candles=10,
                                    atr_period=14,
                                    gap_threshold=0.5,
                                    vol_zscore_lookback=22,
@@ -609,6 +616,7 @@ def identity_zones_with_multibase(df,ratio,max_base_candles=10,
   """Calculates indicators and identifies potential DZone/SZone locations, including continuous zones."""
   df = calculate_true_range(df.copy()) # Adding TR
   df = calculate_atr(df, period=atr_period)               # Adding ATR
+  df = compute_ema20_50(df)               # Adding EMA20, EMA50
   df = classify_candles(df,ratio)      # Adding Is_base, Is_Exciting, Is_Explosive to the Df
   df = compute_gap_flags(df,gap_threshold=gap_threshold)           # Adding Gap to the Df
   df = compute_volume_zscore(df, lookback=vol_zscore_lookback,
@@ -618,6 +626,7 @@ def identity_zones_with_multibase(df,ratio,max_base_candles=10,
   df = compute_bos_flags_n_liquidity_sweep(df, swing_lookback = structure_swing_lookback,
                                             sweep_wick_ratio= sweep_wick_ratio) # Adding BOS_Bull , BOS_Bear, Sweep_High, Sweep_Low # Unclear how BOS will work in Contnuous zones
   df = detect_order_blocks(df,require_bos_for_order_block=require_bos_for_order_block) # Adding Bullish_OB, Bearish_OB
+  df = determine_market_trend(df, window=trend_window) # Adding Trend
 
   n                         = len(df)
   is_exc,is_base,is_exp     = df['Is_Exciting'],df['Is_Base'],df['Is_Explosive']
@@ -744,7 +753,7 @@ def check_refined_htf_support(daily_row, htf_df, creation_date):
     return False
 
 def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_df=None, nifty_1wk_df=None, nifty_1mo_df=None,
-                           weekly_trend_window=52):
+                           trend_window=52):
     """Calculates a score for each zone based on Freshness, Strength, Base Count, Weekly Trend, and HTF Support."""
     # Initialize columns
     # df_ts = df[df['Zone_Created'] == True].copy()
@@ -767,9 +776,9 @@ def calculate_trade_score(ticker,df, weekly_df=None, monthly_df=None, nifty_1d_d
     # Insert ticker as first column
     df_ts.insert(0, 'Ticker', ticker)
 
-    if weekly_df is not None and not weekly_df.empty:
+    if weekly_df is not None and not weekly_df.empty and "Trend" not in weekly_df.columns:
       # weekly_df = determine_market_trend(weekly_df, fast_period = 20, slow_period = 50)
-      weekly_df = determine_market_trend(weekly_df, window=weekly_trend_window)
+      weekly_df = determine_market_trend(weekly_df, window=trend_window)
 
     # Identify where zones were created (The Leg-out candle)
     zone_indices = np.where(df['Zone_Created'] == True)[0]
@@ -1086,14 +1095,16 @@ def run_strategy_for_ticker(ticker, data, ratio,
     if zone_params:
         zp.update(zone_params)
 
-    zone_kwargs = {k: v for k, v in zp.items() if k != "weekly_trend_window"}
+    # zone_kwargs = {k: v for k, v in zp.items() if k != "weekly_trend_window"}
+    zone_kwargs = {k: v for k, v in zp.items() if not k.startswith("trend_window")}
+
 
     out = {'anal':{'ts':None,'bt':None,'rm':None},
             'zones':{'1d':None,'1wk':None,'1mo':None}}
 
-    df_with_zones_1d = identity_zones_with_multibase(data[ticker]['1d'], ratio['GEN.NS']['1d'], **zone_kwargs)
-    df_with_zones_1wk = identity_zones_with_multibase(data[ticker]['1wk'], ratio['GEN.NS']['1wk'], **zone_kwargs)
-    df_with_zones_1mo = identity_zones_with_multibase(data[ticker]['1mo'], ratio['GEN.NS']['1mo'], **zone_kwargs)
+    df_with_zones_1d = identity_zones_with_multibase(data[ticker]['1d'], ratio['GEN.NS']['1d'], zp['trend_window_1d'], **zone_kwargs)
+    df_with_zones_1wk = identity_zones_with_multibase(data[ticker]['1wk'], ratio['GEN.NS']['1wk'], zp['trend_window_1wk'], **zone_kwargs)
+    df_with_zones_1mo = identity_zones_with_multibase(data[ticker]['1mo'], ratio['GEN.NS']['1mo'], zp['trend_window_1mo'], **zone_kwargs)
 
     if df_with_zones_1d.empty:
       print(f'No Zones found for {ticker}')
@@ -1103,7 +1114,7 @@ def run_strategy_for_ticker(ticker, data, ratio,
     df_ts,df_with_zones_1wk = calculate_trade_score(ticker,
                                                     df_with_zones_1d, df_with_zones_1wk, df_with_zones_1mo,
                                                     nifty_1d_df, nifty_1wk_df, nifty_1mo_df,
-                                                    weekly_trend_window=zp["weekly_trend_window"])
+                                                    trend_window=zp["trend_window_1wk"])
     out['anal']['ts'] = df_ts
 
     df_bt = backtest_zones(ticker, df_with_zones_1d)

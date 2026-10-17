@@ -196,7 +196,7 @@ def render_sidebar() -> dict:
 
     st.sidebar.divider()
 
-    if st.sidebar.button("Reset all filters", icon=":material/restart_alt:", use_container_width=True,
+    if st.sidebar.button("Reset all filters", icon=":material/restart_alt:", width="stretch",
                           help="Clears chart/table filter selections (Base Count, Zone Type, Strength, etc). "
                                "Does not re-run analysis or change these sidebar settings."):
         for key in list(st.session_state.keys()):

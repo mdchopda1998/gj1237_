@@ -204,7 +204,7 @@ def render(config: dict, results):
         "Exit Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
         "Date Created": st.column_config.DateColumn(format="YYYY-MM-DD"),
     }
-    st.dataframe(_style_trade_log(enriched), use_container_width=True, hide_index=True,
+    st.dataframe(_style_trade_log(enriched), width="stretch", hide_index=True,
                  column_config=column_config)
     st.caption(f"{len(filtered)} of {len(trade_log_source)} trades shown.")
 

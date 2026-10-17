@@ -199,7 +199,7 @@ def render(config: dict, results):
                                          filtered_zones=filtered, trade_score=score_df,
                                          trim_mode=trim_mode, trade_log=log_df)
                 chart_heading(config["ticker"], tf_label, len(filtered))
-                st.plotly_chart(fig, use_container_width=True, key=f"zone_chart_{tf_key}")
+                st.plotly_chart(fig, width="stretch", key=f"zone_chart_{tf_key}")
 
                 total_zones = int(zone_df["Zone_Created"].sum()) if "Zone_Created" in zone_df.columns else 0
                 source = results.data_sources.get(tf_key, "unknown")
@@ -221,7 +221,7 @@ def render(config: dict, results):
                         if col in zone_df.columns:
                             n_marked += int(zone_df[col].sum())
                 chart_heading(config["ticker"], tf_label, n_marked)
-                st.plotly_chart(fig, use_container_width=True, key=f"plain_chart_{tf_key}")
+                st.plotly_chart(fig, width="stretch", key=f"plain_chart_{tf_key}")
 
                 source = results.data_sources.get(tf_key, "unknown")
                 source_note = SOURCE_NOTES.get(source, source)
@@ -252,7 +252,7 @@ def render(config: dict, results):
                         filtered_zones=nifty_filtered, trim_mode="breach",
                     )
                     chart_heading("NIFTY 50", tf_label, len(nifty_filtered))
-                    st.plotly_chart(nifty_fig, use_container_width=True, key=f"nifty_chart_{tf_key}")
+                    st.plotly_chart(nifty_fig, width="stretch", key=f"nifty_chart_{tf_key}")
 
                     nifty_total = int(nifty_df["Zone_Created"].sum()) if "Zone_Created" in nifty_df.columns else 0
                     nifty_sources = getattr(results, "nifty_data_sources", None) or {}
@@ -271,7 +271,7 @@ def render(config: dict, results):
                             if col in nifty_df.columns:
                                 nifty_n_marked += int(nifty_df[col].sum())
                     chart_heading("NIFTY 50", tf_label, nifty_n_marked)
-                    st.plotly_chart(nifty_fig, use_container_width=True, key=f"nifty_plain_chart_{tf_key}")
+                    st.plotly_chart(nifty_fig, width="stretch", key=f"nifty_plain_chart_{tf_key}")
 
                     nifty_sources = getattr(results, "nifty_data_sources", None) or {}
                     nifty_source = nifty_sources.get(tf_key, "unknown")
@@ -304,7 +304,7 @@ def render(config: dict, results):
                             "Base Start Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
                             "Exit/Breach Date": st.column_config.DateColumn(format="YYYY-MM-DD"),
                         }
-                        st.dataframe(table, use_container_width=True, hide_index=True,
+                        st.dataframe(table, width="stretch", hide_index=True,
                                      column_config=column_config)
                         st.download_button(
                             f"Download {tf_label.lower()} zones as CSV",

@@ -99,8 +99,8 @@ def render(config: dict):
 
     b1, b2 = st.columns([1, 1])
     run_batch = b1.button("Run Batch Analysis", type="primary", icon=":material/play_arrow:",
-                           disabled=(len(tickers) == 0), use_container_width=True)
-    if b2.button("Clear batch results", icon=":material/delete:", use_container_width=True):
+                           disabled=(len(tickers) == 0), width="stretch")
+    if b2.button("Clear batch results", icon=":material/delete:", width="stretch"):
         for key in ("batch_results", "batch_table", "batch_timestamp"):
             st.session_state.pop(key, None)
         st.rerun()
@@ -224,14 +224,14 @@ def render(config: dict):
         "Composite Score": st.column_config.ProgressColumn(format="%.1f", min_value=0, max_value=100),
         "Profit Factor": st.column_config.NumberColumn(format="%.2f"),
     }
-    st.dataframe(_style_batch(display_for_table), use_container_width=True, hide_index=True,
+    st.dataframe(_style_batch(display_for_table), width="stretch", hide_index=True,
                  column_config=column_config)
     st.caption(f"{len(display_table)} of {len(table)} tickers shown.")
 
     errored = table[table["Status"] == "Error"]
     if not errored.empty:
         with st.expander(f"{len(errored)} ticker(s) with errors", icon=":material/warning:"):
-            st.dataframe(errored[["Ticker", "Error"]], use_container_width=True, hide_index=True)
+            st.dataframe(errored[["Ticker", "Error"]], width="stretch", hide_index=True)
 
     st.download_button(
         "Download batch results as CSV",
