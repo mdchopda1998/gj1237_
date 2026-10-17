@@ -126,15 +126,15 @@ def _render_metric_cards(m: dict, trade_log=None, initial_capital=None):
             return_pct = (final_capital - initial_capital) / initial_capital * 100
 
         stat_cards([
-            {"label": "Win Rate", "value": f"{win_rate:.1f}%",
-             "color": "bull" if win_rate >= 50 else "bear",
-             "delta": f"{winning_trades} wins / {losing_trades} losses"},
-            {"label": "Profit Factor", "value": pf_display,
-             "color": "bull" if _safe_num(pf, 0) >= 1 else "bear",
-             "delta": "Above breakeven (1.0)" if _safe_num(pf, 0) >= 1 else "Below breakeven (1.0)"},
             {"label": "System Expectancy", "value": format_inr(expectancy),
              "color": "bull" if expectancy >= 0 else "bear",
              "delta": f"Avg PnL {format_inr(m.get('Avg PnL'))}" if m.get("Avg PnL") is not None else None},
+            {"label": "Profit Factor", "value": pf_display,
+             "color": "bull" if _safe_num(pf, 0) >= 1 else "bear",
+             "delta": "Above breakeven (1.0)" if _safe_num(pf, 0) >= 1 else "Below breakeven (1.0)"},
+            {"label": "Win Rate", "value": f"{win_rate:.1f}%",
+             "color": "bull" if win_rate >= 50 else "bear",
+             "delta": f"{winning_trades} wins / {losing_trades} losses"},
         ])
         stat_cards([
             {"label": "Final Capital", "value": format_inr(final_capital) if final_capital is not None else "N/A",
