@@ -89,7 +89,7 @@ def _equity_curve(trade_log) -> go.Figure:
     return fig
 
 
-def _render_metric_cards(m: dict, trade_log=None, initial_capital=None):
+def _render_metric_cards(m: dict, trade_log=None, initial_capital=None,risk_pct = None):
     left, right = st.columns([1, 2])
     with left:
         st.plotly_chart(_composite_gauge(m.get("Composite Score")), width="stretch", key="composite_gauge_chart")
@@ -104,6 +104,7 @@ def _render_metric_cards(m: dict, trade_log=None, initial_capital=None):
         win_rate = _safe_num(m.get("Win Rate"), 0)
         expectancy = _safe_num(m.get("System Expectancy"), 0)
         net_pnl = _safe_num(m.get("Net PNL"), 0)
+        avg_pnl = _safe_num(m.get('Avg PnL'),0)
         total_trades = m.get("Total Trades", 0) or 0
         winning_trades = m.get("Winning Trades", 0) or 0
         losing_trades = max(total_trades - winning_trades, 0)
@@ -111,6 +112,7 @@ def _render_metric_cards(m: dict, trade_log=None, initial_capital=None):
         supply_zones = m.get("Supply Zones", 0) or 0
         profitable_demand = m.get("Profitable Demand Zones", 0) or 0
         profitable_supply = m.get("Profitable Supply Zones", 0) or 0
+        risk_per_trade = initial_capital * risk_pct
 
         # Final Capital = the last Capital_After_Trade in the trade log
         # (sorted by Exit Date) - your real run_risk_management_simulation
@@ -126,29 +128,32 @@ def _render_metric_cards(m: dict, trade_log=None, initial_capital=None):
             return_pct = (final_capital - initial_capital) / initial_capital * 100
 
         stat_cards([
-            {"label": "System Expectancy", "value": format_inr(expectancy),
-             "color": "bull" if expectancy >= 0 else "bear",
-             "delta": f"Avg PnL {format_inr(m.get('Avg PnL'))}" if m.get("Avg PnL") is not None else None},
+            {"label": "System Expectancy", "value": f"{expectancy:.2f}%",
+             "color": "mbull" if expectancy >= 0.2 else "mbear",
+             "delta":  "Above 0.2R" if expectancy >= 0.2 else "Below 0.2R"},
             {"label": "Profit Factor", "value": pf_display,
-             "color": "bull" if _safe_num(pf, 0) >= 1 else "bear",
-             "delta": "Above breakeven (1.0)" if _safe_num(pf, 0) >= 1 else "Below breakeven (1.0)"},
-            {"label": "Win Rate", "value": f"{win_rate:.1f}%",
-             "color": "bull" if win_rate >= 50 else "bear",
-             "delta": f"{winning_trades} wins / {losing_trades} losses"},
+             "color": "mbull" if _safe_num(pf, 0) >= 1.5 else "mbear",
+             "delta": "Above breakeven (1.5)" if _safe_num(pf, 0) >= 1.5 else "Below breakeven (1.5)"},
+            {"label": "Avg PnL", "value": format_inr(avg_pnl),
+             "color": "mbull" if avg_pnl >= 0 else "mbear",},            
         ])
         stat_cards([
-            {"label": "Final Capital", "value": format_inr(final_capital) if final_capital is not None else "N/A",
-             "color": "brand"},
+            {"label": "Total Trades", "value": total_trades, "color": "accent"},      
+            {"label": "Win Rate", "value": f"{win_rate:.1f}%",
+                        "color": "bull" if win_rate >= 50 else "bear",
+                        "delta": f"{winning_trades} wins / {losing_trades} losses"},                    
             {"label": "Net PNL", "value": format_inr(net_pnl),
              "color": "bull" if net_pnl >= 0 else "bear",
              "delta": f"{return_pct:+.1f}% return" if return_pct is not None else None},
-            {"label": "Total Trades", "value": total_trades, "color": "accent"},
+            
         ])
         stat_cards([
             {"label": "Demand Zones", "value": f"{demand_zones} trades", "color": "bull",
              "delta": f"{profitable_demand} wins"},
             {"label": "Supply Zones", "value": f"{supply_zones} trades", "color": "bear",
              "delta": f"{profitable_supply} wins"},
+            {"label": "Final Capital", "value": format_inr(final_capital) if final_capital is not None else "N/A",
+             "color": "brand"},              
         ])
 
     if trade_log is not None and not trade_log.empty and "Exit Date" in trade_log.columns:
@@ -237,7 +242,7 @@ def render(config: dict, results):
     )
 
     if not use_filtered:
-        _render_metric_cards(m, trade_log=results.trade_log, initial_capital=config.get('initial_capital'))
+        _render_metric_cards(m, trade_log=results.trade_log, initial_capital=config.get('initial_capital'),risk_pct = config.get('risk_pct'))
         st.dataframe(_style_trade_log(results.trade_bt), width="stretch", hide_index=True)
         return
 
@@ -282,4 +287,4 @@ def render(config: dict, results):
         st.warning(f"Couldn't compute filtered metrics: {filtered_metrics['_error']}")
         return
 
-    _render_metric_cards(filtered_metrics, trade_log=filtered_trade_log, initial_capital=config.get('initial_capital'))
+    _render_metric_cards(filtered_metrics, trade_log=filtered_trade_log, initial_capital=config.get('initial_capital'),risk_pct = config.get('risk_pct'))

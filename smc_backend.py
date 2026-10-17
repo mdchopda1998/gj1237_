@@ -1081,7 +1081,8 @@ def run_risk_management_simulation(df_bt, initial_capital, risk_percentage_per_t
 
         # Set the exit date for the newly active trade
         active_trade_exit_date = trade_exit_date
-    df_rm = df_rm.drop(columns=['Entry Price','Exit Price','Outcome','P/L','R-Multiple','Proximal','Distal','Target'])
+    # df_rm = df_rm.drop(columns=['Entry Price','Exit Price','Outcome','P/L','R-Multiple','Proximal','Distal','Target'])
+    df_rm = df_rm.drop(columns=['Entry Price','Exit Price','Outcome','P/L','Proximal','Distal','Target'])
 
     return df_rm
 
@@ -1626,14 +1627,18 @@ def evaluate_strategy_metrics(summary_df):
     # 2. Average profit per winning trade
     if not winning_trades.empty:
         metrics['Average Profit per Winning Trade'] = winning_trades['Trade_PnL'].mean()
+        metrics['Average Profit per Winning Trade R'] = winning_trades['R-Multiple'].mean()
     else:
         metrics['Average Profit per Winning Trade'] = 0.0
+        metrics['Average Profit per Winning Trade R'] = 0.0
 
     # 3. Average loss per losing trade (as absolute value)
     if not losing_trades.empty:
         metrics['Average Loss per Losing Trade'] = abs(losing_trades['Trade_PnL'].mean())
+        metrics['Average Loss per Losing Trade R'] = abs(losing_trades['R-Multiple'].mean())
     else:
         metrics['Average Loss per Losing Trade'] = 0.0
+        metrics['Average Loss per Losing Trade R'] = 0.0
 
     # 4. Profit factor
     total_gross_profit = winning_trades['Trade_PnL'].sum()
@@ -1655,7 +1660,12 @@ def evaluate_strategy_metrics(summary_df):
     # 5. System expectancy
     avg_win = metrics['Average Profit per Winning Trade']
     avg_loss = metrics['Average Loss per Losing Trade']
-    metrics['System Expectancy'] = (win_rate * avg_win) - (loss_rate * avg_loss)
+    metrics['System Expectancy Org'] = (win_rate * avg_win) - (loss_rate * avg_loss)
+
+    avg_win_r = metrics['Average Profit per Winning Trade R']
+    avg_loss_r = metrics['Average Loss per Losing Trade R']
+
+    metrics['System Expectancy'] = (win_rate * avg_win_r) - (loss_rate * avg_loss_r)
 
     # 6. Expectancy score
     # Calculate days in backtest
@@ -1706,6 +1716,9 @@ def evaluate_strategy_metrics(summary_df):
     avg_pierce = summary_df['Piercing_Depth'].mean() * 100
     metrics['Avg Piercing %'] = avg_pierce
     metrics['Avg PnL'] = summary_df['Trade_PnL'].mean()
+
+    print(metrics['Avg PnL'])
+    print(metrics['System Expectancy'])
 
     return metrics
 
